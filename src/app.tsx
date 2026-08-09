@@ -3,6 +3,7 @@ import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import React from "react";
 import Footer from "./components/footer";
 import { StationItem } from "./components/station-item";
+import { TripPlanner } from "./components/trip-planner";
 import { useLanguage } from "./hooks/use-language";
 import { useMeasure } from "./hooks/use-measure";
 import { usePersistedState } from "./hooks/use-persisted-state";
@@ -10,7 +11,14 @@ import { useStations } from "./hooks/use-stations";
 import { cn, createKey } from "./utils";
 
 export function App() {
-  const [state, setState] = React.useState<"VIEW" | "SEARCH" | "ADD">("VIEW");
+  const [state, setState] = React.useState<"VIEW" | "SEARCH" | "ADD" | "TRIP">(
+    "VIEW",
+  );
+  const [isTrip, setIsTrip] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsTrip(state === "TRIP");
+  }, [state]);
 
   const [ref, height] = useMeasure<HTMLDivElement>();
 
@@ -136,26 +144,46 @@ export function App() {
                               />
                             </svg>
                             <h1 className="font-mono text-lg tracking-tight">
-                              Comuline
+                              Jalurin
                             </h1>
                           </div>
                           {state === "VIEW" ? (
-                            <motion.button
-                              whileTap={{ scale: 0.75 }}
-                              initial={{
-                                visibility: "hidden",
-                              }}
-                              animate={{
-                                visibility: "visible",
-                              }}
-                              exit={{
-                                visibility: "hidden",
-                              }}
-                              onClick={() => setState("SEARCH")}
-                              className="rounded-md p-1.5 transition duration-200 ease-in-out hover:bg-zinc-100"
-                            >
-                              <SearchMd className="size-5" />
-                            </motion.button>
+                            <div className="flex items-center gap-1">
+                              <motion.button
+                                whileTap={{ scale: 0.75 }}
+                                initial={{ visibility: "hidden" }}
+                                animate={{ visibility: "visible" }}
+                                exit={{ visibility: "hidden" }}
+                                onClick={() => setState("TRIP")}
+                                className="rounded-md p-1.5 transition duration-200 ease-in-out hover:bg-zinc-100"
+                                title="Trip Planner"
+                              >
+                                <svg
+                                  width="20"
+                                  height="20"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <circle cx="6" cy="19" r="3" />
+                                  <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" />
+                                  <circle cx="18" cy="5" r="3" />
+                                </svg>
+                              </motion.button>
+                              <motion.button
+                                whileTap={{ scale: 0.75 }}
+                                initial={{ visibility: "hidden" }}
+                                animate={{ visibility: "visible" }}
+                                exit={{ visibility: "hidden" }}
+                                onClick={() => setState("SEARCH")}
+                                className="rounded-md p-1.5 transition duration-200 ease-in-out hover:bg-zinc-100"
+                              >
+                                <SearchMd className="size-5" />
+                              </motion.button>
+                            </div>
                           ) : null}
                         </motion.div>
                       )}
@@ -171,8 +199,11 @@ export function App() {
                         return prev === "ADD" ? "VIEW" : "ADD";
                       });
                     }}
-                    data-state={"open"}
-                    className="rounded-md p-2 transition hover:bg-zinc-100"
+                    data-state={isTrip ? "closed" : "open"}
+                    className={cn(
+                      "rounded-md p-2 transition hover:bg-zinc-100",
+                      isTrip && "pointer-events-none opacity-0",
+                    )}
                   >
                     <Plus
                       className={cn(
@@ -239,7 +270,19 @@ export function App() {
         </AnimatePresence>
 
         <AnimatePresence mode="popLayout" initial={false}>
-          {state === "ADD" ? (
+          {state === "TRIP" ? (
+            <motion.section
+              key="trip"
+              transition={{ type: "spring", duration: 0.8, bounce: 0.3 }}
+              initial={{ opacity: 0, filter: "blur(20px)" }}
+              animate={{ opacity: 1, filter: "blur(0px)" }}
+              exit={{ opacity: 0, filter: "blur(20px)" }}
+              style={{ marginTop: "76px" }}
+              className="mx-auto flex h-fit w-full max-w-[500px] flex-col py-6"
+            >
+              <TripPlanner onBack={() => setState("VIEW")} />
+            </motion.section>
+          ) : state === "ADD" ? (
             <motion.section
               key="add-station"
               transition={{

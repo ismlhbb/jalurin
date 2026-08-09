@@ -1,86 +1,40 @@
-<a href="https://www.comuline.com">
-  <img alt="Comuline — Simple & beautiful KRL commuter line schedule app" src="public/og.png">
-  <h1 align="center">Comuline</h1>
-</a>
+# Jalurin
 
-<p align="center">
-  Simple & beautiful KRL commuter line schedule app
-</p>
+Jadwal KRL + Trip Planner dengan transit Transjakarta.
 
-<p align="center">
-  <a href="https://twitter.com/abielzulio">
-    <img src="https://img.shields.io/twitter/follow/abielzulio?style=flat&label=abielzulio&logo=twitter&color=0bf&logoColor=fff" alt="Abiel Zulio M Twitter follower count" />
-  </a>
-  <a href="https://github.com/abielzulio/jadwal-krl">
-    <img src="https://img.shields.io/github/stars/abielzulio/jadwal-krl?label=abielzulio%jadwal-krl" alt="Jadwal KRL app repo star count" />
-  </a>
-</p>
+Fork dari [Comuline Web](https://github.com/comuline/web) (AGPLv3). Tambahan utama:
 
-<p align="center">
-  <a href="#introduction"><strong>Introduction</strong></a> ·
-  <a href="#development"><strong>Development</strong></a> ·
-  <a href="#contributing"><strong>Contributing</strong></a> ·
-  <a href="#author"><strong>Author</strong></a> ·
-  <a href="#license"><strong>License</strong></a>
-</p>
-<br/>
-
-## Introduction
-
-[Comuline](https://www.comuline.com) is a dead-ass simple & beautiful Indonesian public train commuter line app, featuring search and save station locally and get real-time schedule from our [own public API replication](https://github.com/comuline/api). [Comuline](https://www.comuline.com) built with [Vite](https://vite.dev/) and deployed to [Cloudflare Pages](https://pages.cloudflare.com/).
-
-[Comuline](https://www.comuline.com) made as a public act of our belief that public transportation data should be publicly accessible.
-To any stakeholder that responsible with the data that we're consumed, if you read this, [I'm](https://www.linkedin.com/in/abielzulio/) willing to join your team to build the best public transportation data infrastructure ever for our own good sake.
+- **Trip Planner**: cari rute antar stasiun KRL, otomatis nambahin leg Transjakarta (BRT) kalau butuh transit.
+- Data Transjakarta dari [GTFS resmi](https://gtfs.transjakarta.co.id/files/file_gtfs.zip) (14 koridor BRT, 245 halte).
+- Transit map 32 stasiun KRL ↔ halte BRT (`src/data/transit.json`).
+- Planner jalan **100% di browser** (TypeScript, BFS level koridor) — tanpa backend.
 
 ## Development
 
-To get a local copy up and running, please follow these simple steps.
+```sh
+pnpm i
+cp .env.example .env   # VITE_COMULINE_API_URL="https://api.comuline.com"
+pnpm run dev           # port 3000
+```
 
-### Setup
+## Build & Deploy (Vercel)
 
-1. Clone the repo
+```sh
+pnpm run build         # output .dist/
+```
 
-   ```sh
-   git clone https://github.com/comuline/web.git
-   ```
+Vercel: import repo GitHub → build command `pnpm run build` → output dir `.dist` → env `VITE_COMULINE_API_URL=https://api.comuline.com`.
 
-2. Go to the project folder
+## Struktur
 
-   ```sh
-   cd web
-   ```
-
-3. Install packages
-
-   ```sh
-   bun i
-   ```
-
-4. Copy the `.env.example` to `.env`
-
-   ```sh
-   cp .env.example .env
-   ```
-
-5. Generate typescript SDK from the API using [OpenAPI TS](https://openapi-ts.dev/)
-
-   ```sh
-   bun run api:gen
-   ```
-
-6. Run the app locally
-
-   ```sh
-   bun run dev
-   ```
-
-## Contributing
-
-Here's how you can contribute:
-
-- [Open an issue](https://github.com/comuline/web/issues) if you believe you've encountered a bug.
-- Make a [pull request](https://github.com/comuline/web/pull) to add new features/make quality-of-life improvements/fix bugs.
+```
+src/
+  data/transjakarta.json   # halte + koridor BRT (dari GTFS)
+  data/transit.json        # stasiun KRL ↔ halte TJ
+  lib/planner.ts           # trip planner client-side
+  components/trip-planner.tsx
+```
 
 ## License
 
-Distributed under the [AGPLv3 License](https://github.com/comuline/web/blob/main/LICENSE). See `LICENSE` for more information.
+AGPLv3 — lihat [LICENSE](LICENSE). Data Transjakarta © PT Transportasi Jakarta.
