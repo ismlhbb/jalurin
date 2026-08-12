@@ -131,7 +131,7 @@ const Footer = () => {
         <a
           target="_blank"
           rel="noopener noreferrer"
-          href="https://www.api.comuline.com/docs"
+          href="https://api.comuline.com/docs"
           className="underline opacity-50 transition hover:opacity-100"
         >
           API

@@ -1,0 +1,2 @@
+/* Cloudflare Pages SPA fallback: semua route ga-ditemukan → index.html */
+/* 404.html untuk route yang ga match */

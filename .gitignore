@@ -1,5 +1,13 @@
-node_modules
-.dist
+# deps & build
+node_modules/
+.dist/
+dist/
+
+# env
 .env
-.vercel
-*.tsbuildinfo
+.env.*
+!.env.example
+
+# Cloudflare / Vercel
+.vercel/
+.wrangler/

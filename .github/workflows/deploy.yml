@@ -1,11 +1,30 @@
-# Deploy to Vercel
+# ============================================================
+# Jalurin — Cloudflare Pages Deploy (best practice)
+# ============================================================
+# Deploy otomatis setiap push ke main. Build pakai pnpm,
+# output `.dist` dikirim ke Cloudflare Pages via wrangler action.
+#
+# Setup sekali (secrets):
+#   CLOUDFLARE_API_TOKEN  → token API Cloudflare (scope: Cloudflare Pages Edit)
+#   CLOUDFLARE_ACCOUNT_ID → account ID Cloudflare (dashboard → right sidebar)
+# ============================================================
+name: Deploy to Cloudflare Pages
+
 on:
   push:
     branches: [main]
+  workflow_dispatch: # manual trigger dari GitHub Actions tab
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: true
+
     steps:
       - uses: actions/checkout@v4
 
@@ -16,18 +35,18 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Build
         run: pnpm run build
         env:
           VITE_COMULINE_API_URL: "https://api.comuline.com"
 
-      - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v20
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
         with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          working-directory: ./
-          vercel-args: "--prod"
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy .dist --project-name=comuline-web
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
