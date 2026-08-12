@@ -1,28 +1,139 @@
 import React from "react";
-import { useStations } from "../hooks/use-stations";
 import { cn } from "../utils";
-import { planTrip, TripOption, TripLeg } from "../lib/planner";
+import {
+  planTrip,
+  TripOption,
+  TripLeg,
+  Pref,
+} from "../lib/planner";
 
 type Props = {
   onBack: () => void;
 };
 
-const fmtRupiah = (n: number) =>
-  "Rp" + n.toLocaleString("id-ID");
+type GeoResult = { lat: number; lon: number; name: string; type: string };
+
+const fmtRupiah = (n: number) => "Rp" + n.toLocaleString("id-ID");
+
+const PREFS: { key: Pref; label: string }[] = [
+  { key: "cheapest", label: "💸 Termurah" },
+  { key: "fastest", label: "⚡ Tercepat" },
+  { key: "min_transit", label: "🔁 Minim Transit" },
+  { key: "min_walk", label: "🚶 Minim Jalan" },
+];
 
 export const TripPlanner = ({ onBack }: Props) => {
-  const { data: stations } = useStations();
-  const [from, setFrom] = React.useState("");
-  const [to, setTo] = React.useState("");
-  const [searchFrom, setSearchFrom] = React.useState("");
-  const [searchTo, setSearchTo] = React.useState("");
-  const [active, setActive] = React.useState<"from" | "to" | null>(null);
+  const [fromText, setFromText] = React.useState("");
+  const [toText, setToText] = React.useState("");
+  const [fromGeo, setFromGeo] = React.useState<GeoResult | null>(null);
+  const [toGeo, setToGeo] = React.useState<GeoResult | null>(null);
+  const [fromSuggest, setFromSuggest] = React.useState<GeoResult[]>([]);
+  const [toSuggest, setToSuggest] = React.useState<GeoResult[]>([]);
+  const [pref, setPref] = React.useState<Pref>("cheapest");
   const [options, setOptions] = React.useState<TripOption[] | null>(null);
-  const [selected, setSelected] = React.useState<number>(0);
+  const [selected, setSelected] = React.useState(0);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [aiQuery, setAiQuery] = React.useState("");
   const [aiLoading, setAiLoading] = React.useState(false);
+  const [geocoding, setGeocoding] = React.useState<"from" | "to" | null>(null);
+
+  // debounce geocode
+  React.useEffect(() => {
+    const t = setTimeout(async () => {
+      const q = fromText.trim();
+      if (!q || fromGeo?.name === q) {
+        setFromSuggest([]);
+        return;
+      }
+      setGeocoding("from");
+      try {
+        const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        setFromSuggest(data.results || []);
+      } catch {
+        setFromSuggest([]);
+      } finally {
+        setGeocoding(null);
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [fromText, fromGeo]);
+
+  React.useEffect(() => {
+    const t = setTimeout(async () => {
+      const q = toText.trim();
+      if (!q || toGeo?.name === q) {
+        setToSuggest([]);
+        return;
+      }
+      setGeocoding("to");
+      try {
+        const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        setToSuggest(data.results || []);
+      } catch {
+        setToSuggest([]);
+      } finally {
+        setGeocoding(null);
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [toText, toGeo]);
+
+  const pickFrom = (r: GeoResult) => {
+    setFromGeo(r);
+    setFromText(r.name);
+    setFromSuggest([]);
+    setOptions(null);
+    setError("");
+  };
+  const pickTo = (r: GeoResult) => {
+    setToGeo(r);
+    setToText(r.name);
+    setToSuggest([]);
+    setOptions(null);
+    setError("");
+  };
+
+  const plan = () => {
+    if (!fromGeo || !toGeo || loading) return;
+    setLoading(true);
+    setError("");
+    setOptions(null);
+    setTimeout(() => {
+      try {
+        const opts = planTrip(
+          [fromGeo.lat, fromGeo.lon],
+          [toGeo.lat, toGeo.lon],
+          fromGeo.name,
+          toGeo.name,
+          pref,
+        );
+        if (!opts.length) {
+          setError(
+            "Belum ada rute untuk lokasi ini. Coba lokasi lain (lebih dekat ke stasiun/halte).",
+          );
+        } else {
+          setOptions(opts);
+          setSelected(0);
+        }
+      } catch (e) {
+        setError("Gagal memuat rute. Coba lagi.");
+      } finally {
+        setLoading(false);
+      }
+    }, 50);
+  };
+
+  const swap = () => {
+    setFromText(toText);
+    setToText(fromText);
+    setFromGeo(toGeo);
+    setToGeo(fromGeo);
+    setOptions(null);
+    setError("");
+  };
 
   const askAi = async () => {
     const q = aiQuery.trim();
@@ -40,16 +151,23 @@ export const TripPlanner = ({ onBack }: Props) => {
         setError(data.error || "AI gagal memproses");
         return;
       }
-      const fromStation = list.find((s) => s.id === data.from);
-      const toStation = list.find((s) => s.id === data.to);
-      if (fromStation && toStation) {
-        setFrom(`${fromStation.id} · ${fromStation.name}`);
-        setTo(`${toStation.id} · ${toStation.name}`);
+      // AI kasih kode stasiun — geocode nama stasiun
+      const stationsRes = await fetch(`/api/geocode?q=${encodeURIComponent(`stasiun ${data.from}`)}`);
+      const stationsData = await stationsRes.json();
+      const s1 = stationsData.results?.[0];
+      const s2res = await fetch(`/api/geocode?q=${encodeURIComponent(`stasiun ${data.to}`)}`);
+      const s2data = await s2res.json();
+      const s2 = s2data.results?.[0];
+      if (s1 && s2) {
+        setFromGeo({ lat: s1.lat, lon: s1.lon, name: s1.name, type: "station" });
+        setToGeo({ lat: s2.lat, lon: s2.lon, name: s2.name, type: "station" });
+        setFromText(s1.name);
+        setToText(s2.name);
         setOptions(null);
         setError("");
       } else {
         setError(
-          `AI ga kenal stasiun: ${data.from || "?"} → ${data.to || "?"}. Pilih manual.`,
+          `AI ga bisa locate stasiun: ${data.from || "?"} → ${data.to || "?"}`,
         );
       }
     } catch (e) {
@@ -57,66 +175,6 @@ export const TripPlanner = ({ onBack }: Props) => {
     } finally {
       setAiLoading(false);
     }
-  };
-
-  const list = (stations?.data || []).sort((a, b) =>
-    a.name.localeCompare(b.name),
-  );
-
-  const filtered = list.filter((s) => {
-    const q = (active === "from" ? searchFrom : searchTo).toLowerCase();
-    if (!q) return true;
-    return s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q);
-  });
-
-  const pick = (id: string, name: string) => {
-    if (active === "from") {
-      setFrom(`${id} · ${name}`);
-      setSearchFrom("");
-    } else {
-      setTo(`${id} · ${name}`);
-      setSearchTo("");
-    }
-    setActive(null);
-    setOptions(null);
-    setError("");
-  };
-
-  const plan = () => {
-    const fromId = from.split(" ")[0];
-    const toId = to.split(" ")[0];
-    if (!fromId || !toId) return;
-    setLoading(true);
-    setError("");
-    setOptions(null);
-    // mikro-latency biar UI loading keliatan (opsional)
-    setTimeout(() => {
-      try {
-        const opts = planTrip(fromId, toId);
-        if (!opts.length) {
-          setError("Belum ada rute untuk kombinasi ini. Coba pilih stasiun lain.");
-        } else {
-          setOptions(opts);
-          setSelected(0);
-        }
-      } catch (e) {
-        setError("Gagal memuat rute. Coba lagi.");
-      } finally {
-        setLoading(false);
-      }
-    }, 50);
-  };
-
-  const swap = () => {
-    setFrom(to);
-    setTo(from);
-    setOptions(null);
-    setError("");
-  };
-
-  const stopName = (id: string) => {
-    const s = list.find((x) => x.id === id);
-    return s ? s.name : id;
   };
 
   const opt = options?.[selected] ?? null;
@@ -137,7 +195,7 @@ export const TripPlanner = ({ onBack }: Props) => {
       {/* AI input */}
       <div className="flex flex-col gap-1.5">
         <label className="text-xs opacity-50">
-          Tanya AI — contoh: "dari Bekasi ke Tanah Abang"
+          Tanya AI — contoh: "dari rumah di Bekasi ke kantor Tanah Abang"
         </label>
         <div className="flex gap-2">
           <input
@@ -157,40 +215,35 @@ export const TripPlanner = ({ onBack }: Props) => {
         </div>
       </div>
 
-      {/* asal */}
+      {/* Dari */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs opacity-50">Dari</label>
+        <label className="text-xs opacity-50">Dari (lokasi / alamat)</label>
         <div className="relative">
-          <button
-            onClick={() => setActive(active === "from" ? null : "from")}
-            className="flex w-full items-center justify-between rounded-md bg-zinc-100 px-3 py-2.5 text-left text-sm"
-          >
-            <span className={cn(!from && "opacity-40")}>
-              {from || "Pilih stasiun"}
+          <input
+            value={fromText}
+            onChange={(e) => {
+              setFromText(e.target.value);
+              if (fromGeo?.name !== e.target.value) setFromGeo(null);
+            }}
+            placeholder="cth: Jl. Sudirman, Jakarta"
+            className="w-full rounded-md bg-zinc-100 px-3 py-2.5 text-sm outline-none focus:bg-white focus:ring-1 focus:ring-zinc-300"
+          />
+          {geocoding === "from" && (
+            <span className="absolute right-3 top-3 text-xs opacity-40">
+              mencari...
             </span>
-            <span className="text-xs opacity-40">▼</span>
-          </button>
-          {active === "from" && (
+          )}
+          {fromSuggest.length > 0 && (
             <div className="absolute z-30 mt-1 w-full rounded-md border border-zinc-200 bg-white shadow-lg">
-              <input
-                autoFocus
-                value={searchFrom}
-                onChange={(e) => setSearchFrom(e.target.value)}
-                placeholder="Cari stasiun..."
-                className="w-full border-b border-zinc-100 px-3 py-2 text-sm outline-none"
-              />
-              <div className="max-h-52 overflow-y-auto">
-                {filtered.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => pick(s.id, s.name)}
-                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm capitalize hover:bg-zinc-50"
-                  >
-                    <span>{s.name.toLowerCase()}</span>
-                    <span className="font-mono text-xs opacity-30">{s.id}</span>
-                  </button>
-                ))}
-              </div>
+              {fromSuggest.map((r, i) => (
+                <button
+                  key={i}
+                  onClick={() => pickFrom(r)}
+                  className="block w-full px-3 py-2 text-left text-sm hover:bg-zinc-50"
+                >
+                  {r.name}
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -206,49 +259,65 @@ export const TripPlanner = ({ onBack }: Props) => {
         </button>
       </div>
 
-      {/* tujuan */}
+      {/* Ke */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs opacity-50">Ke</label>
+        <label className="text-xs opacity-50">Ke (lokasi / alamat)</label>
         <div className="relative">
-          <button
-            onClick={() => setActive(active === "to" ? null : "to")}
-            className="flex w-full items-center justify-between rounded-md bg-zinc-100 px-3 py-2.5 text-left text-sm"
-          >
-            <span className={cn(!to && "opacity-40")}>
-              {to || "Pilih stasiun"}
+          <input
+            value={toText}
+            onChange={(e) => {
+              setToText(e.target.value);
+              if (toGeo?.name !== e.target.value) setToGeo(null);
+            }}
+            placeholder="cth: Stasiun Tanah Abang"
+            className="w-full rounded-md bg-zinc-100 px-3 py-2.5 text-sm outline-none focus:bg-white focus:ring-1 focus:ring-zinc-300"
+          />
+          {geocoding === "to" && (
+            <span className="absolute right-3 top-3 text-xs opacity-40">
+              mencari...
             </span>
-            <span className="text-xs opacity-40">▼</span>
-          </button>
-          {active === "to" && (
+          )}
+          {toSuggest.length > 0 && (
             <div className="absolute z-30 mt-1 w-full rounded-md border border-zinc-200 bg-white shadow-lg">
-              <input
-                autoFocus
-                value={searchTo}
-                onChange={(e) => setSearchTo(e.target.value)}
-                placeholder="Cari stasiun..."
-                className="w-full border-b border-zinc-100 px-3 py-2 text-sm outline-none"
-              />
-              <div className="max-h-52 overflow-y-auto">
-                {filtered.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => pick(s.id, s.name)}
-                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm capitalize hover:bg-zinc-50"
-                  >
-                    <span>{s.name.toLowerCase()}</span>
-                    <span className="font-mono text-xs opacity-30">{s.id}</span>
-                  </button>
-                ))}
-              </div>
+              {toSuggest.map((r, i) => (
+                <button
+                  key={i}
+                  onClick={() => pickTo(r)}
+                  className="block w-full px-3 py-2 text-left text-sm hover:bg-zinc-50"
+                >
+                  {r.name}
+                </button>
+              ))}
             </div>
           )}
         </div>
       </div>
 
+      {/* preferensi */}
+      <div className="flex flex-wrap gap-1.5">
+        {PREFS.map((p) => (
+          <button
+            key={p.key}
+            onClick={() => {
+              setPref(p.key);
+              setOptions(null);
+            }}
+            className={cn(
+              "rounded-full px-3 py-1.5 text-xs transition",
+              pref === p.key
+                ? "bg-zinc-900 text-white"
+                : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200",
+            )}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
       {/* cari */}
       <button
         onClick={plan}
-        disabled={!from || !to || loading}
+        disabled={!fromGeo || !toGeo || loading}
         className="mt-2 rounded-md bg-zinc-900 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:opacity-40"
       >
         {loading ? "Mencari rute..." : "Cari Rute"}
@@ -275,7 +344,9 @@ export const TripPlanner = ({ onBack }: Props) => {
             >
               <div>
                 <p className="text-sm font-medium">{o.label}</p>
-                <p className="text-xs opacity-40">{o.desc}</p>
+                <p className="text-xs opacity-40">
+                  {o.transfers} transit · {o.walkKm.toFixed(1)} km jalan
+                </p>
               </div>
               <div className="text-right">
                 <p className="font-mono text-sm">±{o.totalMinutes} mnt</p>
@@ -288,12 +359,12 @@ export const TripPlanner = ({ onBack }: Props) => {
         </div>
       )}
 
-      {/* detail rute terpilih */}
+      {/* detail rute */}
       {opt && (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium">
-              {stopName(from.split(" ")[0])} → {stopName(to.split(" ")[0])}
+              {fromText} → {toText}
             </p>
             <p className="text-xs opacity-50">
               ±{opt.totalMinutes} mnt · {fmtRupiah(opt.totalCost)}
@@ -307,8 +378,8 @@ export const TripPlanner = ({ onBack }: Props) => {
                   <span className="text-xs text-zinc-500">
                     {leg.mode === "tj" && leg.route
                       ? `ganti koridor ${leg.route}`
-                      : leg.mode === "gojek"
-                        ? "lanjut Gojek"
+                      : leg.mode === "goride"
+                        ? "lanjut GoRide"
                         : "lanjut"}
                   </span>
                 </div>
@@ -329,7 +400,7 @@ export const TripPlanner = ({ onBack }: Props) => {
                       ? "KRL"
                       : leg.mode === "tj"
                         ? `TJ ${leg.route}`
-                        : "GOJEK"}
+                        : "GORIDE"}
                   </span>
                   <span className="text-xs opacity-50">
                     {leg.minutes ? `± ${leg.minutes} mnt` : ""}
@@ -338,15 +409,11 @@ export const TripPlanner = ({ onBack }: Props) => {
                 </div>
                 <div className="mt-2 flex items-center justify-between text-sm">
                   <span className="font-medium capitalize">
-                    {leg.mode === "krl"
-                      ? stopName(leg.from)
-                      : leg.from_name || leg.from}
+                    {leg.from_name || leg.from}
                   </span>
                   <span className="mx-2 flex-1 border-t border-dashed border-zinc-300" />
                   <span className="font-medium capitalize">
-                    {leg.mode === "krl"
-                      ? stopName(leg.to)
-                      : leg.to_name || leg.to}
+                    {leg.to_name || leg.to}
                   </span>
                 </div>
                 {leg.note && (
@@ -365,8 +432,8 @@ export const TripPlanner = ({ onBack }: Props) => {
 
       {/* info */}
       <p className="pt-2 text-center text-[11px] opacity-40">
-        KRL + Transjakarta + Gojek. Estimasi biaya & waktu, bisa beda dari
-        aktual.
+        Model GoTransit: GoRide first/last mile + KRL + Transjakarta. Estimasi
+        biaya & waktu, bisa beda dari aktual.
       </p>
     </div>
   );

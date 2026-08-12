@@ -12,7 +12,7 @@ const graph = plannerGraph as unknown as {
   transfers: Record<string, string>;
 };
 
-export type TripMode = "krl" | "tj" | "gojek";
+export type TripMode = "krl" | "tj" | "goride";
 
 export type TripLeg = {
   mode: TripMode;
@@ -24,6 +24,7 @@ export type TripLeg = {
   stops?: string[];
   minutes?: number;
   cost?: number;
+  walk_km?: number;
   note?: string;
 };
 
@@ -33,8 +34,11 @@ export type TripOption = {
   totalMinutes: number;
   totalCost: number;
   transfers: number;
+  walkKm: number;
   legs: TripLeg[];
 };
+
+export type Pref = "min_transit" | "min_walk" | "cheapest" | "fastest";
 
 // ---- data lookup ----
 const STOP_NAME: Record<string, string> = {};
@@ -48,8 +52,10 @@ const ROUTE_BY_ID: Record<string, TjRoute> = {};
 for (const r of tj.routes) ROUTE_BY_ID[r.id] = r;
 
 const KRL_NAME = (id: string) => graph.stations[id]?.name ?? id;
-const KRL_COORD = (id: string): [number, number] | undefined => graph.krl_coords[id];
-const TJ_STOP = (id: string): TjStop | undefined => tj.stops.find((s) => s.id === id);
+const KRL_COORD = (id: string): [number, number] | undefined =>
+  graph.krl_coords[id];
+const TJ_STOP = (id: string): TjStop | undefined =>
+  tj.stops.find((s) => s.id === id);
 
 // ---- geo ----
 function haversineKm(
@@ -66,18 +72,22 @@ function haversineKm(
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-// ---- harga ----
-// KRL Commuter Line: flat Rp3.000 (2024, non-subsidi mulai 2025 ± Rp5.000)
-const KRL_COST = 3000;
-// Transjakarta: flat Rp3.500
-const TJ_COST = 3500;
-// Gojek: estimasi Rp2.500 flagfall + Rp3.000/km (jauh > 2km)
-function gojekCost(km: number) {
-  return Math.round(2500 + km * 3000);
+// ---- harga real (Jabodetabek, 2024/2025) ----
+// KRL Commuter Line: tarif per km, jarak <=25km = Rp3.000, >25km naik bertahap
+function krlCost(distanceKm: number) {
+  if (distanceKm <= 25) return 3000;
+  if (distanceKm <= 30) return 4500;
+  return 6000;
 }
-// waktu gojek: 25 km/jam di kota (macet)
-function gojekMinutes(km: number) {
-  return Math.max(5, Math.round((km / 25) * 60) + 3);
+// Transjakarta: flat Rp3.500 (non-AC) / Rp5.000 (AC)
+const TJ_COST = 3500;
+// GoRide: flagfall Rp8.000 + Rp2.500/km, minimal Rp12.000 (realistis Jabodetabek)
+function goRideCost(km: number) {
+  return Math.max(12000, Math.round(8000 + km * 2500));
+}
+// GoRide waktu: 20 km/jam di kota (macet Jakarta) + 3 mnt order
+function goRideMinutes(km: number) {
+  return Math.max(6, Math.round((km / 20) * 60) + 5);
 }
 
 // ---- KRL graph ----
@@ -87,25 +97,32 @@ for (const e of graph.edges) {
   (KRL_ADJ[e.b] ??= []).push({ nb: e.a, line: e.line });
 }
 
-// BFS/DFS antar stasiun KRL — return jalur (tanpa waktu real, estimasi per edge)
-function krlPath(from: string, to: string): { station: string; line: string }[] | null {
+function krlPath(
+  from: string,
+  to: string,
+): { station: string; line: string }[] | null {
   if (from === to) return [{ station: from, line: "" }];
+  // Dijkstra dengan bobot = menit (bukan jumlah stop)
+  const dist: Record<string, number> = { [from]: 0 };
   const prev: Record<string, { station: string; line: string } | null> = {
     [from]: null,
   };
-  const q = [from];
-  while (q.length) {
-    const cur = q.shift()!;
+  const pq: string[] = [from];
+  while (pq.length) {
+    pq.sort((a, b) => (dist[a] ?? Infinity) - (dist[b] ?? Infinity));
+    const cur = pq.shift()!;
     if (cur === to) break;
     for (const { nb, line } of KRL_ADJ[cur] ?? []) {
-      if (!(nb in prev)) {
+      const w = krlSegmentMinutes(cur, nb);
+      const nd = (dist[cur] ?? 0) + w;
+      if (nd < (dist[nb] ?? Infinity)) {
+        dist[nb] = nd;
         prev[nb] = { station: cur, line };
-        q.push(nb);
+        pq.push(nb);
       }
     }
   }
   if (!(to in prev)) return null;
-  // reconstruct
   const path: { station: string; line: string }[] = [];
   let cur: string | null = to;
   while (cur) {
@@ -116,13 +133,11 @@ function krlPath(from: string, to: string): { station: string; line: string }[] 
   return path;
 }
 
-// estimasi durasi KRL per segmen (2 stasiun berurutan)
 function krlSegmentMinutes(a: string, b: string) {
   const ca = KRL_COORD(a);
   const cb = KRL_COORD(b);
   if (ca && cb) {
     const km = haversineKm(ca, cb);
-    // KRL ~45 km/jam avg + 2 mnt dwell
     return Math.max(3, Math.round((km / 45) * 60) + 2);
   }
   return 6;
@@ -145,7 +160,15 @@ function tjPath(fromStop: string, toStop: string): TripLeg[] {
     q.push({
       stop: fromStop,
       route: rid,
-      legs: [{ mode: "tj" as const, route: rid, from: fromStop, to: fromStop, stops: [fromStop] }],
+      legs: [
+        {
+          mode: "tj" as const,
+          route: rid,
+          from: fromStop,
+          to: fromStop,
+          stops: [fromStop],
+        },
+      ],
     });
     seen.add(`${fromStop}|${rid}`);
   }
@@ -169,16 +192,34 @@ function tjPath(fromStop: string, toStop: string): TripLeg[] {
         last.from = nxt;
       }
       if (nxt === toStop) {
-        if (!best || legs2.reduce((a, l) => a + (l.stops?.length ?? 0), 0) < best.reduce((a, l) => a + (l.stops?.length ?? 0), 0)) {
+        const len = legs2.reduce((a, l) => a + (l.stops?.length ?? 0), 0);
+        const corr = legs2.length; // jumlah koridor = jumlah leg
+        if (
+          !best ||
+          corr * 20 + len <
+            best.length * 20 +
+              best.reduce((a, l) => a + (l.stops?.length ?? 0), 0)
+        ) {
           best = legs2;
         }
         return;
       }
       for (const rid2 of STOP_ROUTES[nxt] ?? []) {
         if (rid2 !== route && !seen.has(`${nxt}|${rid2}`)) {
+          // limit maksimal 2 koridor (1 ganti) — lebih dari itu ga praktis
+          if (legs.length >= 2) continue;
           seen.add(`${nxt}|${rid2}`);
-          const legs3 = legs2.map((l) => ({ ...l, stops: l.stops ? [...l.stops] : undefined }));
-          legs3.push({ mode: "tj" as const, route: rid2, from: nxt, to: nxt, stops: [nxt] });
+          const legs3 = legs2.map((l) => ({
+            ...l,
+            stops: l.stops ? [...l.stops] : undefined,
+          }));
+          legs3.push({
+            mode: "tj" as const,
+            route: rid2,
+            from: nxt,
+            to: nxt,
+            stops: [nxt],
+          });
           q.push({ stop: nxt, route: rid2, legs: legs3 });
         }
       }
@@ -201,179 +242,232 @@ function tjPath(fromStop: string, toStop: string): TripLeg[] {
         m += 4;
       }
     }
-    return { ...l, from_name: STOP_NAME[l.from] ?? l.from, to_name: STOP_NAME[l.to] ?? l.to, minutes: m, cost: TJ_COST };
+    return {
+      ...l,
+      from_name: STOP_NAME[l.from] ?? l.from,
+      to_name: STOP_NAME[l.to] ?? l.to,
+      minutes: m,
+      cost: TJ_COST,
+    };
   });
 }
 
-// ---- helper gojek leg ----
-function gojekLeg(from: [number, number], to: [number, number], fromName: string, toName: string): TripLeg {
-  const km = haversineKm(from, to);
+// ---- GoRide leg ----
+function goRideLeg(
+  fromName: string,
+  toName: string,
+  fromCoord: [number, number],
+  toCoord: [number, number],
+): TripLeg {
+  const km = haversineKm(fromCoord, toCoord);
   return {
-    mode: "gojek",
+    mode: "goride",
     from: fromName,
     to: toName,
     from_name: fromName,
     to_name: toName,
-    minutes: gojekMinutes(km),
-    cost: gojekCost(km),
-    note: `Gojek ±${km.toFixed(1)} km`,
+    minutes: goRideMinutes(km),
+    cost: goRideCost(km),
+    note: `GoRide ${km.toFixed(1)} km`,
   };
 }
 
-// ---- main plan ----
+// ---- nearest station / TJ stop dari koordinat ----
+function nearestKrl(coord: [number, number]): string | null {
+  let best: string | null = null;
+  let bd = Infinity;
+  for (const [id, c] of Object.entries(graph.krl_coords)) {
+    const d = haversineKm(coord, c);
+    if (d < bd) {
+      bd = d;
+      best = id;
+    }
+  }
+  return bd <= 8 ? best : null; // max 8km ke stasiun
+}
+
+function nearestTjStop(coord: [number, number]): string | null {
+  let best: string | null = null;
+  let bd = Infinity;
+  for (const s of tj.stops) {
+    const d = haversineKm(coord, [s.lat, s.lon]);
+    if (d < bd) {
+      bd = d;
+      best = s.id;
+    }
+  }
+  return bd <= 3 ? best : null; // max 3km ke halte
+}
+
+// ---- plan utama (GoTransit model) ----
 export function planTrip(
-  fromStation: string,
-  toStation: string,
+  fromCoord: [number, number],
+  toCoord: [number, number],
+  fromLabel: string,
+  toLabel: string,
+  pref: Pref = "cheapest",
 ): TripOption[] {
-  if (fromStation === toStation) return [];
   const results: TripOption[] = [];
+  const fromKrl = nearestKrl(fromCoord);
+  const toKrl = nearestKrl(toCoord);
+  const fromTj = nearestTjStop(fromCoord);
+  const toTj = nearestTjStop(toCoord);
 
-  const fromCoord = KRL_COORD(fromStation);
-  const toCoord = KRL_COORD(toStation);
-  if (!fromCoord || !toCoord) return [];
+  const push = (o: TripOption) => {
+    results.push(o);
+  };
 
-  const fromTransit = graph.transfers[fromStation];
-  const toTransit = graph.transfers[toStation];
-
-  // ===== Opsi A: Gojek langsung (termurah buat jarak dekat / ga ada transit) =====
+  // ===== Opsi 1: GoRide langsung =====
   {
     const km = haversineKm(fromCoord, toCoord);
-    const leg = gojekLeg(fromCoord, toCoord, KRL_NAME(fromStation), KRL_NAME(toStation));
-    results.push({
-      label: "Gojek Langsung",
-      desc: `${km.toFixed(1)} km langsung`,
+    const leg = goRideLeg(fromLabel, toLabel, fromCoord, toCoord);
+    push({
+      label: "GoRide Langsung",
+      desc: `${km.toFixed(1)} km langsung, tanpa transit`,
       totalMinutes: leg.minutes ?? 0,
       totalCost: leg.cost ?? 0,
       transfers: 0,
+      walkKm: 0,
       legs: [leg],
     });
   }
 
-  // ===== Opsi B: KRL + TJ + Gojek (multimodal) =====
-  // pattern: KRL(from) -> transit TJ -> TJ -> gojek -> dest
-  // atau KRL penuh kalau 2 stasiun terhubung
-  const krl = krlPath(fromStation, toStation);
-  if (krl) {
-    const minutes = krlLegMinutes(krl);
-    results.push({
-      label: "KRL Langsung",
-      desc: `${krl.length - 1} stasiun`,
-      totalMinutes: minutes,
-      totalCost: KRL_COST,
-      transfers: 0,
-      legs: [
-        {
-          mode: "krl",
-          from: fromStation,
-          to: toStation,
-          from_name: KRL_NAME(fromStation),
-          to_name: KRL_NAME(toStation),
-          stops: krl.map((k) => k.station),
-          minutes,
-          cost: KRL_COST,
-        },
-      ],
-    });
-  }
-
-  // multimodal: KRL -> TJ transfer
-  if (fromTransit && toTransit) {
-    const tjLegs = tjPath(fromTransit, toTransit);
-    if (tjLegs.length) {
-      const krl1 = krlPath(fromStation, graph.transfers[fromStation]);
-      const krl2 = krlPath(graph.transfers[toStation], toStation);
+  // ===== Opsi 2: GoRide + KRL + GoRide (first/last mile) =====
+  if (fromKrl && toKrl) {
+    const krl = krlPath(fromKrl, toKrl);
+    if (krl && krl.length > 1) {
+      const krlKm = krl.reduce((acc, s, i) => {
+        if (i === 0) return acc;
+        const c1 = KRL_COORD(krl[i - 1].station);
+        const c2 = KRL_COORD(s.station);
+        return acc + (c1 && c2 ? haversineKm(c1, c2) : 0);
+      }, 0);
       const legs: TripLeg[] = [];
-      if (krl1 && krl1.length > 1) {
-        const m = krlLegMinutes(krl1);
-        legs.push({
-          mode: "krl",
-          from: fromStation,
-          to: krl1[krl1.length - 1].station,
-          from_name: KRL_NAME(fromStation),
-          to_name: STOP_NAME[fromTransit] ?? fromTransit,
-          stops: krl1.map((k) => k.station),
-          minutes: m,
-          cost: KRL_COST,
-          note: `naik KRL ke ${STOP_NAME[fromTransit] ?? fromTransit}`,
-        });
-      }
-      legs.push(...tjLegs);
-      if (krl2 && krl2.length > 1) {
-        const m = krlLegMinutes(krl2);
-        legs.push({
-          mode: "krl",
-          from: krl2[0].station,
-          to: toStation,
-          from_name: STOP_NAME[toTransit] ?? toTransit,
-          to_name: KRL_NAME(toStation),
-          stops: krl2.map((k) => k.station),
-          minutes: m,
-          cost: KRL_COST,
-          note: `lanjut KRL ke ${KRL_NAME(toStation)}`,
-        });
-      }
-      const totalMinutes = legs.reduce((a, l) => a + (l.minutes ?? 0), 0);
-      const totalCost = legs.reduce((a, l) => a + (l.cost ?? 0), 0);
-      const transfers = legs.filter((l, i) => i > 0 && (l.mode !== legs[i - 1].mode || l.route !== legs[i - 1].route)).length;
-      results.push({
-        label: "KRL + Transjakarta",
-        desc: `via ${STOP_NAME[fromTransit] ?? fromTransit} → ${STOP_NAME[toTransit] ?? toTransit}`,
-        totalMinutes,
-        totalCost,
-        transfers,
+      const g1 = goRideLeg(fromLabel, KRL_NAME(fromKrl), fromCoord, KRL_COORD(fromKrl)!);
+      const g2 = goRideLeg(KRL_NAME(toKrl), toLabel, KRL_COORD(toKrl)!, toCoord);
+      legs.push(g1);
+      legs.push({
+        mode: "krl",
+        from: fromKrl,
+        to: toKrl,
+        from_name: KRL_NAME(fromKrl),
+        to_name: KRL_NAME(toKrl),
+        stops: krl.map((k) => k.station),
+        minutes: krlLegMinutes(krl),
+        cost: krlCost(krlKm),
+        note: `KRL ${krl.length - 1} stasiun (${krlKm.toFixed(1)} km)`,
+      });
+      legs.push(g2);
+      push({
+        label: "GoRide + KRL + GoRide",
+        desc: `${KRL_NAME(fromKrl)} → ${KRL_NAME(toKrl)}`,
+        totalMinutes: legs.reduce((a, l) => a + (l.minutes ?? 0), 0),
+        totalCost: legs.reduce((a, l) => a + (l.cost ?? 0), 0),
+        transfers: 2,
+        walkKm: 0,
         legs,
       });
     }
   }
 
-  // ===== Opsi C: KRL + Gojek (last mile) =====
-  if (fromTransit) {
-    const krl1 = krlPath(fromStation, graph.transfers[fromStation]);
-    if (krl1 && krl1.length > 1) {
-      const mid = krl1[krl1.length - 1].station;
-      const midCoord = KRL_COORD(mid);
+  // ===== Opsi 3: GoRide + KRL + Transjakarta + GoRide =====
+  if (fromKrl && toKrl && fromTj && toTj) {
+    const fromTransit = graph.transfers[fromKrl];
+    const toTransit = graph.transfers[toKrl];
+    const krl1 = fromTransit ? krlPath(fromKrl, fromTransit) : null;
+    const krl2 = toTransit ? krlPath(toTransit, toKrl) : null;
+    const tjLegs = tjPath(fromTj, toTj);
+    if (tjLegs.length && krl1 && krl2) {
       const legs: TripLeg[] = [];
-      legs.push({
-        mode: "krl",
-        from: fromStation,
-        to: mid,
-        from_name: KRL_NAME(fromStation),
-        to_name: KRL_NAME(mid),
-        stops: krl1.map((k) => k.station),
-        minutes: krlLegMinutes(krl1),
-        cost: KRL_COST,
-      });
-      if (midCoord && toCoord) {
-        legs.push(gojekLeg(midCoord, toCoord, KRL_NAME(mid), KRL_NAME(toStation)));
-      }
-      if (legs.length > 1) {
-        results.push({
-          label: "KRL + Gojek",
-          desc: `turun di ${KRL_NAME(mid)}, lanjut Gojek`,
-          totalMinutes: legs.reduce((a, l) => a + (l.minutes ?? 0), 0),
-          totalCost: legs.reduce((a, l) => a + (l.cost ?? 0), 0),
-          transfers: 1,
-          legs,
+      legs.push(goRideLeg(fromLabel, KRL_NAME(fromKrl), fromCoord, KRL_COORD(fromKrl)!));
+      if (krl1.length > 1) {
+        legs.push({
+          mode: "krl",
+          from: fromKrl,
+          to: krl1[krl1.length - 1].station,
+          from_name: KRL_NAME(fromKrl),
+          to_name: STOP_NAME[fromTj] ?? fromTj,
+          stops: krl1.map((k) => k.station),
+          minutes: krlLegMinutes(krl1),
+          cost: TJ_COST,
         });
       }
+      legs.push(...tjLegs);
+      if (krl2.length > 1) {
+        legs.push({
+          mode: "krl",
+          from: krl2[0].station,
+          to: toKrl,
+          from_name: STOP_NAME[toTj] ?? toTj,
+          to_name: KRL_NAME(toKrl),
+          stops: krl2.map((k) => k.station),
+          minutes: krlLegMinutes(krl2),
+          cost: TJ_COST,
+        });
+      }
+      legs.push(goRideLeg(KRL_NAME(toKrl), toLabel, KRL_COORD(toKrl)!, toCoord));
+      push({
+        label: "GoRide + KRL + Transjakarta",
+        desc: `via ${STOP_NAME[fromTj] ?? fromTj} → ${STOP_NAME[toTj] ?? toTj}`,
+        totalMinutes: legs.reduce((a, l) => a + (l.minutes ?? 0), 0),
+        totalCost: legs.reduce((a, l) => a + (l.cost ?? 0), 0),
+        transfers: 3,
+        walkKm: 0,
+        legs,
+      });
     }
   }
 
-  // ===== sort + label kriteria =====
-  const sorted = [...results].sort((a, b) => a.totalMinutes - b.totalMinutes);
+  // ===== Opsi 4: GoRide + Transjakarta + GoRide (no KRL) =====
+  if (fromTj && toTj) {
+    const tjLegs = tjPath(fromTj, toTj);
+    if (tjLegs.length) {
+      const legs: TripLeg[] = [
+        goRideLeg(fromLabel, STOP_NAME[fromTj] ?? fromTj, fromCoord, [TJ_STOP(fromTj)!.lat, TJ_STOP(fromTj)!.lon] as [number, number]),
+        ...tjLegs,
+        goRideLeg(STOP_NAME[toTj] ?? toTj, toLabel, [TJ_STOP(toTj)!.lat, TJ_STOP(toTj)!.lon] as [number, number], toCoord),
+      ];
+      push({
+        label: "GoRide + Transjakarta + GoRide",
+        desc: `via ${STOP_NAME[fromTj] ?? fromTj} → ${STOP_NAME[toTj] ?? toTj}`,
+        totalMinutes: legs.reduce((a, l) => a + (l.minutes ?? 0), 0),
+        totalCost: legs.reduce((a, l) => a + (l.cost ?? 0), 0),
+        transfers: 2,
+        walkKm: 0,
+        legs,
+      });
+    }
+  }
+
+  if (!results.length) return [];
+
+  // ===== sort by preference =====
+  const score = (o: TripOption) => {
+    switch (pref) {
+      case "min_transit":
+        return o.transfers * 1000 + o.totalMinutes;
+      case "min_walk":
+        return o.walkKm * 1000 + o.totalMinutes;
+      case "fastest":
+        return o.totalMinutes;
+      default:
+        return o.totalCost;
+    }
+  };
+  const sorted = [...results].sort((a, b) => score(a) - score(b));
+  const best = sorted[0];
+
+  // label kriteria
   const cheapest = [...results].sort((a, b) => a.totalCost - b.totalCost)[0];
   const fastest = [...results].sort((a, b) => a.totalMinutes - b.totalMinutes)[0];
-  const practical = [...results].sort(
-    (a, b) => a.totalMinutes * 0.6 + a.totalCost * 0.4 - (b.totalMinutes * 0.6 + b.totalCost * 0.4),
-  )[0];
-
-  // annotate label
+  const minTransit = [...results].sort((a, b) => a.transfers - b.transfers)[0];
   for (const r of results) {
-    if (r === cheapest) r.label = `${r.label} · Termurah`;
-    if (r === fastest && fastest !== cheapest) r.label = `${r.label} · Tercepat`;
-    if (r === practical && practical !== cheapest && practical !== fastest) {
-      r.label = `${r.label} · Terpraktis`;
-    }
+    const tags: string[] = [];
+    if (r === cheapest) tags.push("Termurah");
+    if (r === fastest) tags.push("Tercepat");
+    if (r === minTransit) tags.push("Minim Transit");
+    if (r === best && pref === "min_walk") tags.push("Minim Jalan");
+    r.label = `${r.label}${tags.length ? " · " + tags.join(" · ") : ""}`;
   }
   return sorted;
 }

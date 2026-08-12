@@ -1,7 +1,5 @@
 import { planTrip } from "../src/lib/planner.ts";
 
-// test lokasi → koordinat:
-// Bekasi Timur (rumah) → Sudirman (kantor)
 const cases: {
   label: string;
   from: [number, number];
