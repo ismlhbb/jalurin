@@ -39,7 +39,9 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          # wrangler auto-detect functions/ di root project
+          # Pages Functions harus ada di dalam direktori yang di-deploy
+          mkdir -p .dist
+          cp -r functions .dist/functions
           npx --yes wrangler@4 pages deploy .dist \
             --project-name=comuline-web \
             --branch=main \
