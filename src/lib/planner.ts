@@ -12,7 +12,7 @@ const graph = plannerGraph as unknown as {
   transfers: Record<string, string>;
 };
 
-export type TripMode = "krl" | "tj" | "goride";
+export type TripMode = "krl" | "tj" | "goride" | "walk";
 
 export type TripLeg = {
   mode: TripMode;
@@ -381,6 +381,8 @@ export function planTrip(
       krlMin: number;
       tjMin: number;
       corr: number;
+      walkMin: number;
+      walkKm: number;
     } | null = null;
     // semua halte TJ dalam 1km dari stasiun (bukan cuma yang terdekat)
     const stopsNearKrl = (krlId: string): { id: string; dist: number }[] => {
@@ -399,21 +401,32 @@ export function planTrip(
       const krl = krlPath(fromKrl, krlId);
       if (!krl || krl.length <= 1) continue;
       const krlMin = krlLegMinutes(krl);
-      for (const { id: stopId } of stops) {
+      for (const { id: stopId, dist } of stops) {
         const tjLegs = tjPath(stopId, toTj);
         if (!tjLegs.length) continue;
         const tjMin = tjLegs.reduce((a, l) => a + (l.minutes ?? 0), 0);
         const corr = tjLegs.length;
+        // waktu jalan kaki stasiun → halte (5 km/jam)
+        const walkMin = Math.max(2, Math.round((dist / 5) * 60));
         // penalti per koridor tambahan (prefer rute sedikit ganti koridor)
-        const total = krlMin + tjMin + (corr - 1) * 15;
+        const total = krlMin + tjMin + walkMin + (corr - 1) * 15;
         if (
           !bestTransit ||
           total <
             bestTransit.krlMin +
               bestTransit.tjMin +
+              bestTransit.walkMin +
               (bestTransit.corr - 1) * 15
         ) {
-          bestTransit = { krl: krlId, stop: stopId, krlMin, tjMin, corr };
+          bestTransit = {
+            krl: krlId,
+            stop: stopId,
+            krlMin,
+            tjMin,
+            corr,
+            walkMin,
+            walkKm: dist,
+          };
         }
       }
     }
@@ -443,16 +456,16 @@ export function planTrip(
           cost: krlCost(krlKm),
           note: `KRL ${krl.length - 1} stasiun (${krlKm.toFixed(1)} km)`,
         });
-        // walk KRL station -> TJ stop (kecil, 0-500m)
+        // walk KRL station -> TJ stop (jarak real dari bestTransit)
         const walkLeg: TripLeg = {
-          mode: "goride",
+          mode: "walk",
           from: KRL_NAME(transitKrl),
           to: STOP_NAME[transitStop] ?? transitStop,
           from_name: KRL_NAME(transitKrl),
           to_name: STOP_NAME[transitStop] ?? transitStop,
-          minutes: 4,
+          minutes: bestTransit.walkMin,
           cost: 0,
-          note: "Jalan kaki ke halte",
+          note: `Jalan kaki ${(bestTransit.walkKm * 1000).toFixed(0)} m ke halte`,
         };
         legs.push(walkLeg);
         legs.push(...tjLegs);
@@ -461,11 +474,11 @@ export function planTrip(
         );
         push({
           label: "GoRide + KRL + Transjakarta",
-          desc: `KRL ke ${KRL_NAME(transitKrl)}, lanjut TJ ${STOP_NAME[toTj] ?? toTj}`,
+          desc: `KRL ke ${KRL_NAME(transitKrl)}, jalan ke halte ${STOP_NAME[transitStop] ?? transitStop}, TJ ke ${STOP_NAME[toTj] ?? toTj}`,
           totalMinutes: legs.reduce((a, l) => a + (l.minutes ?? 0), 0),
           totalCost: legs.reduce((a, l) => a + (l.cost ?? 0), 0),
           transfers: 3,
-          walkKm: 0,
+          walkKm: bestTransit.walkKm,
           legs,
         });
       }

@@ -464,9 +464,11 @@ export const TripPlanner = ({ onBack }: Props) => {
                   <span className="text-xs text-zinc-500">
                     {leg.mode === "tj" && leg.route
                       ? `ganti koridor ${leg.route}`
-                      : leg.mode === "goride"
-                        ? "lanjut GoRide"
-                        : "lanjut"}
+                      : leg.mode === "walk"
+                        ? "jalan kaki ke halte"
+                        : leg.mode === "goride"
+                          ? "lanjut GoRide"
+                          : "lanjut"}
                   </span>
                 </div>
               )}
@@ -479,14 +481,18 @@ export const TripPlanner = ({ onBack }: Props) => {
                         ? "bg-blue-100 text-blue-700"
                         : leg.mode === "tj"
                           ? "bg-red-100 text-red-700"
-                          : "bg-green-100 text-green-700",
+                          : leg.mode === "walk"
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-green-100 text-green-700",
                     )}
                   >
                     {leg.mode === "krl"
                       ? "KRL"
                       : leg.mode === "tj"
                         ? `TJ ${leg.route}`
-                        : "GORIDE"}
+                        : leg.mode === "walk"
+                          ? "JALAN"
+                          : "GORIDE"}
                   </span>
                   <span className="text-xs opacity-50">
                     {leg.minutes ? `± ${leg.minutes} mnt` : ""}
