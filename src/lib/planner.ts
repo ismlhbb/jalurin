@@ -449,11 +449,25 @@ export function planTrip(
           return acc + (c1 && c2 ? haversineKm(c1, c2) : 0);
         }, 0);
         const legs: TripLeg[] = [];
-        // kalau fromKrl != transitKrl, naik KRL dulu (skip kalau udah di sana)
+        // GoRide/walk first-mile ke stasiun asal (skip GoRide kalau <400m)
+        const fKrlC = KRL_COORD(fromKrl)!;
+        const firstDist = haversineKm(fromCoord, fKrlC);
+        if (firstDist >= 0.4) {
+          legs.push(goRideLeg(fromLabel, KRL_NAME(fromKrl), fromCoord, fKrlC));
+        } else {
+          legs.push({
+            mode: "walk",
+            from: fromLabel,
+            to: KRL_NAME(fromKrl),
+            from_name: fromLabel,
+            to_name: KRL_NAME(fromKrl),
+            minutes: Math.max(2, Math.round((firstDist / 5) * 60)),
+            cost: 0,
+            note: `Jalan kaki ${(firstDist * 1000).toFixed(0)} m ke stasiun`,
+          });
+        }
+        // kalau fromKrl != transitKrl, naik KRL dulu
         if (fromKrl !== transitKrl) {
-          legs.push(
-            goRideLeg(fromLabel, KRL_NAME(fromKrl), fromCoord, KRL_COORD(fromKrl)!),
-          );
           legs.push({
             mode: "krl",
             from: fromKrl,
@@ -465,10 +479,6 @@ export function planTrip(
             cost: krlCost(krlKm),
             note: `KRL ${krl.length - 1} stasiun (${krlKm.toFixed(1)} km)`,
           });
-        } else {
-          legs.push(
-            goRideLeg(fromLabel, KRL_NAME(fromKrl), fromCoord, KRL_COORD(fromKrl)!),
-          );
         }
         // walk KRL station -> TJ stop (jarak real dari bestTransit)
         const walkLeg: TripLeg = {
