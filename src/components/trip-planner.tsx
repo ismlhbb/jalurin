@@ -38,7 +38,7 @@ export const TripPlanner = ({ onBack }: Props) => {
   const [aiLoading, setAiLoading] = React.useState(false);
   const [geocoding, setGeocoding] = React.useState<"from" | "to" | null>(null);
 
-  // debounce geocode
+  // debounce geocode — hybrid: data lokal (KRL + TJ) + OSM
   React.useEffect(() => {
     const t = setTimeout(async () => {
       const q = fromText.trim();
@@ -48,9 +48,39 @@ export const TripPlanner = ({ onBack }: Props) => {
       }
       setGeocoding("from");
       try {
-        const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        setFromSuggest(data.results || []);
+        // 1. cari di data lokal (KRL stations + TJ stops) — instant, lengkap
+        const local: GeoResult[] = [];
+        const [gData, tjData] = await Promise.all([
+          import("../data/planner-graph.json"),
+          import("../data/transjakarta.json"),
+        ]);
+        const graph = gData.default as unknown as {
+          stations: Record<string, { name: string }>;
+          krl_coords: Record<string, [number, number]>;
+        };
+        const tj = tjData.default as unknown as {
+          stops: { id: string; name: string; lat: number; lon: number }[];
+        };
+        const ql = q.toLowerCase();
+        for (const [id, st] of Object.entries(graph.stations)) {
+          if (st.name.toLowerCase().includes(ql) || id.toLowerCase() === ql) {
+            const c = graph.krl_coords[id];
+            if (c) local.push({ lat: c[0], lon: c[1], name: `🚆 ${st.name}`, type: "station" });
+          }
+        }
+        for (const s of tj.stops) {
+          if (s.name.toLowerCase().includes(ql)) {
+            local.push({ lat: s.lat, lon: s.lon, name: `🚌 ${s.name}`, type: "tj" });
+          }
+        }
+        // 2. kalau ga ada di lokal, baru OSM
+        let osm: GeoResult[] = [];
+        if (local.length === 0) {
+          const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
+          const data = await res.json();
+          osm = (data.results || []).slice(0, 5);
+        }
+        setFromSuggest([...local.slice(0, 6), ...osm]);
       } catch {
         setFromSuggest([]);
       } finally {
@@ -60,6 +90,7 @@ export const TripPlanner = ({ onBack }: Props) => {
     return () => clearTimeout(t);
   }, [fromText, fromGeo]);
 
+  // debounce geocode — hybrid: data lokal (KRL + TJ) + OSM
   React.useEffect(() => {
     const t = setTimeout(async () => {
       const q = toText.trim();
@@ -69,9 +100,39 @@ export const TripPlanner = ({ onBack }: Props) => {
       }
       setGeocoding("to");
       try {
-        const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        setToSuggest(data.results || []);
+        // 1. cari di data lokal (KRL stations + TJ stops) — instant, lengkap
+        const local: GeoResult[] = [];
+        const [gData, tjData] = await Promise.all([
+          import("../data/planner-graph.json"),
+          import("../data/transjakarta.json"),
+        ]);
+        const graph = gData.default as unknown as {
+          stations: Record<string, { name: string }>;
+          krl_coords: Record<string, [number, number]>;
+        };
+        const tj = tjData.default as unknown as {
+          stops: { id: string; name: string; lat: number; lon: number }[];
+        };
+        const ql = q.toLowerCase();
+        for (const [id, st] of Object.entries(graph.stations)) {
+          if (st.name.toLowerCase().includes(ql) || id.toLowerCase() === ql) {
+            const c = graph.krl_coords[id];
+            if (c) local.push({ lat: c[0], lon: c[1], name: `🚆 ${st.name}`, type: "station" });
+          }
+        }
+        for (const s of tj.stops) {
+          if (s.name.toLowerCase().includes(ql)) {
+            local.push({ lat: s.lat, lon: s.lon, name: `🚌 ${s.name}`, type: "tj" });
+          }
+        }
+        // 2. kalau ga ada di lokal, baru OSM
+        let osm: GeoResult[] = [];
+        if (local.length === 0) {
+          const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
+          const data = await res.json();
+          osm = (data.results || []).slice(0, 5);
+        }
+        setToSuggest([...local.slice(0, 6), ...osm]);
       } catch {
         setToSuggest([]);
       } finally {
@@ -151,23 +212,48 @@ export const TripPlanner = ({ onBack }: Props) => {
         setError(data.error || "AI gagal memproses");
         return;
       }
-      // AI kasih kode stasiun — geocode nama stasiun
-      const stationsRes = await fetch(`/api/geocode?q=${encodeURIComponent(`stasiun ${data.from}`)}`);
-      const stationsData = await stationsRes.json();
-      const s1 = stationsData.results?.[0];
-      const s2res = await fetch(`/api/geocode?q=${encodeURIComponent(`stasiun ${data.to}`)}`);
-      const s2data = await s2res.json();
-      const s2 = s2data.results?.[0];
+      // AI kasih kode stasiun/halte — resolve via data lokal (bukan geocode OSM)
+      const resolveStation = async (code: string) => {
+        const norm = code.trim().toUpperCase();
+        // coba cari di data KRL (graph) — coords langsung
+        const g = await import("../data/planner-graph.json");
+        const graph = g.default as unknown as {
+          stations: Record<string, { name: string }>;
+          krl_coords: Record<string, [number, number]>;
+        };
+        if (graph.stations[norm] && graph.krl_coords[norm]) {
+          return {
+            lat: graph.krl_coords[norm][0],
+            lon: graph.krl_coords[norm][1],
+            name: graph.stations[norm].name,
+            type: "station",
+          };
+        }
+        // cari di data TJ
+        const tjData = await import("../data/transjakarta.json");
+        const tj = tjData.default as unknown as {
+          stops: { id: string; name: string; lat: number; lon: number }[];
+        };
+        const stop = tj.stops.find(
+          (s) => s.id.toUpperCase() === norm || s.name.toLowerCase().includes(code.toLowerCase()),
+        );
+        if (stop) {
+          return { lat: stop.lat, lon: stop.lon, name: stop.name, type: "tj" };
+        }
+        return null;
+      };
+      const s1 = await resolveStation(data.from || "");
+      const s2 = await resolveStation(data.to || "");
       if (s1 && s2) {
-        setFromGeo({ lat: s1.lat, lon: s1.lon, name: s1.name, type: "station" });
-        setToGeo({ lat: s2.lat, lon: s2.lon, name: s2.name, type: "station" });
+        setFromGeo(s1);
+        setToGeo(s2);
         setFromText(s1.name);
         setToText(s2.name);
         setOptions(null);
         setError("");
       } else {
         setError(
-          `AI ga bisa locate stasiun: ${data.from || "?"} → ${data.to || "?"}`,
+          `AI ga bisa locate: ${data.from || "?"} → ${data.to || "?"}. Coba tulis nama lengkap (cth: stasiun Kebayoran, halte CBD Ciledug).`,
         );
       }
     } catch (e) {

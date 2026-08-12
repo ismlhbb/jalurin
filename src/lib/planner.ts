@@ -206,8 +206,8 @@ function tjPath(fromStop: string, toStop: string): TripLeg[] {
       }
       for (const rid2 of STOP_ROUTES[nxt] ?? []) {
         if (rid2 !== route && !seen.has(`${nxt}|${rid2}`)) {
-          // limit maksimal 2 koridor (1 ganti) — lebih dari itu ga praktis
-          if (legs.length >= 2) continue;
+          // limit maksimal 3 koridor (2 ganti) — lebih dari itu ga praktis
+          if (legs.length >= 3) continue;
           seen.add(`${nxt}|${rid2}`);
           const legs3 = legs2.map((l) => ({
             ...l,
@@ -370,51 +370,105 @@ export function planTrip(
     }
   }
 
-  // ===== Opsi 3: GoRide + KRL + Transjakarta + GoRide =====
-  if (fromKrl && toKrl && fromTj && toTj) {
-    const fromTransit = graph.transfers[fromKrl];
-    const toTransit = graph.transfers[toKrl];
-    const krl1 = fromTransit ? krlPath(fromKrl, fromTransit) : null;
-    const krl2 = toTransit ? krlPath(toTransit, toKrl) : null;
-    const tjLegs = tjPath(fromTj, toTj);
-    if (tjLegs.length && krl1 && krl2) {
-      const legs: TripLeg[] = [];
-      legs.push(goRideLeg(fromLabel, KRL_NAME(fromKrl), fromCoord, KRL_COORD(fromKrl)!));
-      if (krl1.length > 1) {
+  // ===== Opsi 3: GoRide + KRL + Transjakarta (KRL dari asal, TJ ke tujuan) =====
+  // GoTransit model: KRL untuk jarak jauh, TJ untuk last-mile (ga butuh KRL di ujung tujuan)
+  if (fromKrl && toTj) {
+    // cari kombinasi (stasiun, halte TJ) terbaik buat transit KRL→TJ:
+    // hitung TOTAL waktu (KRL + TJ) untuk tiap kandidat, pilih yang paling cepat
+    let bestTransit: {
+      krl: string;
+      stop: string;
+      krlMin: number;
+      tjMin: number;
+      corr: number;
+    } | null = null;
+    // semua halte TJ dalam 1km dari stasiun (bukan cuma yang terdekat)
+    const stopsNearKrl = (krlId: string): { id: string; dist: number }[] => {
+      const c = KRL_COORD(krlId);
+      if (!c) return [];
+      const out: { id: string; dist: number }[] = [];
+      for (const s of tj.stops) {
+        const d = haversineKm(c, [s.lat, s.lon]);
+        if (d <= 1.0) out.push({ id: s.id, dist: d });
+      }
+      return out.sort((a, b) => a.dist - b.dist);
+    };
+    for (const krlId of Object.keys(graph.stations)) {
+      const stops = stopsNearKrl(krlId);
+      if (!stops.length) continue;
+      const krl = krlPath(fromKrl, krlId);
+      if (!krl || krl.length <= 1) continue;
+      const krlMin = krlLegMinutes(krl);
+      for (const { id: stopId } of stops) {
+        const tjLegs = tjPath(stopId, toTj);
+        if (!tjLegs.length) continue;
+        const tjMin = tjLegs.reduce((a, l) => a + (l.minutes ?? 0), 0);
+        const corr = tjLegs.length;
+        // penalti per koridor tambahan (prefer rute sedikit ganti koridor)
+        const total = krlMin + tjMin + (corr - 1) * 15;
+        if (
+          !bestTransit ||
+          total <
+            bestTransit.krlMin +
+              bestTransit.tjMin +
+              (bestTransit.corr - 1) * 15
+        ) {
+          bestTransit = { krl: krlId, stop: stopId, krlMin, tjMin, corr };
+        }
+      }
+    }
+    if (bestTransit) {
+      const { krl: transitKrl, stop: transitStop } = bestTransit;
+      const krl = krlPath(fromKrl, transitKrl);
+      const tjLegs = tjPath(transitStop, toTj);
+      if (krl && krl.length > 1 && tjLegs.length) {
+        const krlKm = krl.reduce((acc, s, i) => {
+          if (i === 0) return acc;
+          const c1 = KRL_COORD(krl[i - 1].station);
+          const c2 = KRL_COORD(s.station);
+          return acc + (c1 && c2 ? haversineKm(c1, c2) : 0);
+        }, 0);
+        const legs: TripLeg[] = [];
+        legs.push(
+          goRideLeg(fromLabel, KRL_NAME(fromKrl), fromCoord, KRL_COORD(fromKrl)!),
+        );
         legs.push({
           mode: "krl",
           from: fromKrl,
-          to: krl1[krl1.length - 1].station,
+          to: transitKrl,
           from_name: KRL_NAME(fromKrl),
-          to_name: STOP_NAME[fromTj] ?? fromTj,
-          stops: krl1.map((k) => k.station),
-          minutes: krlLegMinutes(krl1),
-          cost: TJ_COST,
+          to_name: KRL_NAME(transitKrl),
+          stops: krl.map((k) => k.station),
+          minutes: krlLegMinutes(krl),
+          cost: krlCost(krlKm),
+          note: `KRL ${krl.length - 1} stasiun (${krlKm.toFixed(1)} km)`,
+        });
+        // walk KRL station -> TJ stop (kecil, 0-500m)
+        const walkLeg: TripLeg = {
+          mode: "goride",
+          from: KRL_NAME(transitKrl),
+          to: STOP_NAME[transitStop] ?? transitStop,
+          from_name: KRL_NAME(transitKrl),
+          to_name: STOP_NAME[transitStop] ?? transitStop,
+          minutes: 4,
+          cost: 0,
+          note: "Jalan kaki ke halte",
+        };
+        legs.push(walkLeg);
+        legs.push(...tjLegs);
+        legs.push(
+          goRideLeg(STOP_NAME[toTj] ?? toTj, toLabel, [TJ_STOP(toTj)!.lat, TJ_STOP(toTj)!.lon] as [number, number], toCoord),
+        );
+        push({
+          label: "GoRide + KRL + Transjakarta",
+          desc: `KRL ke ${KRL_NAME(transitKrl)}, lanjut TJ ${STOP_NAME[toTj] ?? toTj}`,
+          totalMinutes: legs.reduce((a, l) => a + (l.minutes ?? 0), 0),
+          totalCost: legs.reduce((a, l) => a + (l.cost ?? 0), 0),
+          transfers: 3,
+          walkKm: 0,
+          legs,
         });
       }
-      legs.push(...tjLegs);
-      if (krl2.length > 1) {
-        legs.push({
-          mode: "krl",
-          from: krl2[0].station,
-          to: toKrl,
-          from_name: STOP_NAME[toTj] ?? toTj,
-          to_name: KRL_NAME(toKrl),
-          stops: krl2.map((k) => k.station),
-          minutes: krlLegMinutes(krl2),
-          cost: TJ_COST,
-        });
-      }
-      legs.push(goRideLeg(KRL_NAME(toKrl), toLabel, KRL_COORD(toKrl)!, toCoord));
-      push({
-        label: "GoRide + KRL + Transjakarta",
-        desc: `via ${STOP_NAME[fromTj] ?? fromTj} → ${STOP_NAME[toTj] ?? toTj}`,
-        totalMinutes: legs.reduce((a, l) => a + (l.minutes ?? 0), 0),
-        totalCost: legs.reduce((a, l) => a + (l.cost ?? 0), 0),
-        transfers: 3,
-        walkKm: 0,
-        legs,
-      });
     }
   }
 
