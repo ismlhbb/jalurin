@@ -32,6 +32,8 @@ jobs:
 
       - name: Build
         run: pnpm run build
+        env:
+          VITE_COMULINE_API_URL: https://api.comuline.com
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/pages-action@v1
