@@ -1,11 +1,14 @@
 import React from "react";
 import { useStations } from "../hooks/use-stations";
 import { cn } from "../utils";
-import { planTrip, TripLeg } from "../lib/planner";
+import { planTrip, TripOption, TripLeg } from "../lib/planner";
 
 type Props = {
   onBack: () => void;
 };
+
+const fmtRupiah = (n: number) =>
+  "Rp" + n.toLocaleString("id-ID");
 
 export const TripPlanner = ({ onBack }: Props) => {
   const { data: stations } = useStations();
@@ -14,11 +17,51 @@ export const TripPlanner = ({ onBack }: Props) => {
   const [searchFrom, setSearchFrom] = React.useState("");
   const [searchTo, setSearchTo] = React.useState("");
   const [active, setActive] = React.useState<"from" | "to" | null>(null);
-  const [result, setResult] = React.useState<TripLeg[] | null>(null);
+  const [options, setOptions] = React.useState<TripOption[] | null>(null);
+  const [selected, setSelected] = React.useState<number>(0);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
+  const [aiQuery, setAiQuery] = React.useState("");
+  const [aiLoading, setAiLoading] = React.useState(false);
 
-  const list = (stations?.data || []).sort((a, b) => a.name.localeCompare(b.name));
+  const askAi = async () => {
+    const q = aiQuery.trim();
+    if (!q || aiLoading) return;
+    setAiLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/ai-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: q }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "AI gagal memproses");
+        return;
+      }
+      const fromStation = list.find((s) => s.id === data.from);
+      const toStation = list.find((s) => s.id === data.to);
+      if (fromStation && toStation) {
+        setFrom(`${fromStation.id} · ${fromStation.name}`);
+        setTo(`${toStation.id} · ${toStation.name}`);
+        setOptions(null);
+        setError("");
+      } else {
+        setError(
+          `AI ga kenal stasiun: ${data.from || "?"} → ${data.to || "?"}. Pilih manual.`,
+        );
+      }
+    } catch (e) {
+      setError("Gagal hubungi AI. Coba lagi.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const list = (stations?.data || []).sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
 
   const filtered = list.filter((s) => {
     const q = (active === "from" ? searchFrom : searchTo).toLowerCase();
@@ -35,7 +78,7 @@ export const TripPlanner = ({ onBack }: Props) => {
       setSearchTo("");
     }
     setActive(null);
-    setResult(null);
+    setOptions(null);
     setError("");
   };
 
@@ -45,25 +88,29 @@ export const TripPlanner = ({ onBack }: Props) => {
     if (!fromId || !toId) return;
     setLoading(true);
     setError("");
-    setResult(null);
-    try {
-      const legs = planTrip(fromId, toId);
-      if (legs.length === 0) {
-        setError("Belum ada rute transit Transjakarta untuk stasiun ini");
-      } else {
-        setResult(legs);
+    setOptions(null);
+    // mikro-latency biar UI loading keliatan (opsional)
+    setTimeout(() => {
+      try {
+        const opts = planTrip(fromId, toId);
+        if (!opts.length) {
+          setError("Belum ada rute untuk kombinasi ini. Coba pilih stasiun lain.");
+        } else {
+          setOptions(opts);
+          setSelected(0);
+        }
+      } catch (e) {
+        setError("Gagal memuat rute. Coba lagi.");
+      } finally {
+        setLoading(false);
       }
-    } catch (e) {
-      setError("Gagal memuat rute. Coba lagi.");
-    } finally {
-      setLoading(false);
-    }
+    }, 50);
   };
 
   const swap = () => {
     setFrom(to);
     setTo(from);
-    setResult(null);
+    setOptions(null);
     setError("");
   };
 
@@ -72,7 +119,7 @@ export const TripPlanner = ({ onBack }: Props) => {
     return s ? s.name : id;
   };
 
-  const totalMinutes = result?.reduce((acc, l) => acc + (l.minutes || 0), 0) || 0;
+  const opt = options?.[selected] ?? null;
 
   return (
     <div className="flex h-full w-full flex-col gap-4 px-4">
@@ -87,6 +134,29 @@ export const TripPlanner = ({ onBack }: Props) => {
         <span className="w-8" />
       </div>
 
+      {/* AI input */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs opacity-50">
+          Tanya AI — contoh: "dari Bekasi ke Tanah Abang"
+        </label>
+        <div className="flex gap-2">
+          <input
+            value={aiQuery}
+            onChange={(e) => setAiQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && askAi()}
+            placeholder="Tanya rute natural language..."
+            className="flex-1 rounded-md border border-zinc-200 px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
+          />
+          <button
+            onClick={askAi}
+            disabled={!aiQuery.trim() || aiLoading}
+            className="rounded-md bg-zinc-900 px-4 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:opacity-40"
+          >
+            {aiLoading ? "..." : "AI"}
+          </button>
+        </div>
+      </div>
+
       {/* asal */}
       <div className="flex flex-col gap-1.5">
         <label className="text-xs opacity-50">Dari</label>
@@ -96,7 +166,7 @@ export const TripPlanner = ({ onBack }: Props) => {
             className="flex w-full items-center justify-between rounded-md bg-zinc-100 px-3 py-2.5 text-left text-sm"
           >
             <span className={cn(!from && "opacity-40")}>
-              {from || "Pilih stasiun / halte"}
+              {from || "Pilih stasiun"}
             </span>
             <span className="text-xs opacity-40">▼</span>
           </button>
@@ -145,7 +215,7 @@ export const TripPlanner = ({ onBack }: Props) => {
             className="flex w-full items-center justify-between rounded-md bg-zinc-100 px-3 py-2.5 text-left text-sm"
           >
             <span className={cn(!to && "opacity-40")}>
-              {to || "Pilih stasiun / halte"}
+              {to || "Pilih stasiun"}
             </span>
             <span className="text-xs opacity-40">▼</span>
           </button>
@@ -186,26 +256,60 @@ export const TripPlanner = ({ onBack }: Props) => {
 
       {error && <p className="text-sm text-red-500">{error}</p>}
 
-      {/* hasil */}
-      {result && (
+      {/* daftar opsi */}
+      {options && options.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-medium opacity-50">
+            {options.length} pilihan rute
+          </p>
+          {options.map((o, i) => (
+            <button
+              key={i}
+              onClick={() => setSelected(i)}
+              className={cn(
+                "flex items-center justify-between rounded-md border p-3 text-left transition",
+                i === selected
+                  ? "border-zinc-900 bg-zinc-50"
+                  : "border-zinc-200 hover:border-zinc-400",
+              )}
+            >
+              <div>
+                <p className="text-sm font-medium">{o.label}</p>
+                <p className="text-xs opacity-40">{o.desc}</p>
+              </div>
+              <div className="text-right">
+                <p className="font-mono text-sm">±{o.totalMinutes} mnt</p>
+                <p className="font-mono text-xs opacity-60">
+                  {fmtRupiah(o.totalCost)}
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* detail rute terpilih */}
+      {opt && (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium">
               {stopName(from.split(" ")[0])} → {stopName(to.split(" ")[0])}
             </p>
-            <p className="text-xs opacity-50">± {totalMinutes} menit</p>
+            <p className="text-xs opacity-50">
+              ±{opt.totalMinutes} mnt · {fmtRupiah(opt.totalCost)}
+            </p>
           </div>
-          {result.map((leg, i) => (
+          {opt.legs.map((leg: TripLeg, i: number) => (
             <div key={i} className="flex flex-col gap-1.5">
               {i > 0 && (
                 <div className="flex items-center gap-2 pl-2">
                   <div className="h-4 w-px bg-zinc-300" />
                   <span className="text-xs text-zinc-500">
-                    {leg.mode === "tj" && leg.route ? (
-                      <>ganti koridor {leg.route}</>
-                    ) : (
-                      "lanjut"
-                    )}
+                    {leg.mode === "tj" && leg.route
+                      ? `ganti koridor ${leg.route}`
+                      : leg.mode === "gojek"
+                        ? "lanjut Gojek"
+                        : "lanjut"}
                   </span>
                 </div>
               )}
@@ -216,13 +320,20 @@ export const TripPlanner = ({ onBack }: Props) => {
                       "rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase",
                       leg.mode === "krl"
                         ? "bg-blue-100 text-blue-700"
-                        : "bg-red-100 text-red-700",
+                        : leg.mode === "tj"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-green-100 text-green-700",
                     )}
                   >
-                    {leg.mode === "krl" ? "KRL" : `TJ ${leg.route}`}
+                    {leg.mode === "krl"
+                      ? "KRL"
+                      : leg.mode === "tj"
+                        ? `TJ ${leg.route}`
+                        : "GOJEK"}
                   </span>
                   <span className="text-xs opacity-50">
                     {leg.minutes ? `± ${leg.minutes} mnt` : ""}
+                    {leg.cost ? ` · ${fmtRupiah(leg.cost)}` : ""}
                   </span>
                 </div>
                 <div className="mt-2 flex items-center justify-between text-sm">
@@ -238,12 +349,12 @@ export const TripPlanner = ({ onBack }: Props) => {
                       : leg.to_name || leg.to}
                   </span>
                 </div>
-                {leg.mode === "krl" && leg.note && (
+                {leg.note && (
                   <p className="mt-1.5 text-xs opacity-40">{leg.note}</p>
                 )}
                 {leg.stops && leg.stops.length > 1 && (
                   <p className="mt-1.5 text-xs opacity-40">
-                    {leg.stops.length - 1} halte
+                    {leg.stops.length - 1} stasiun
                   </p>
                 )}
               </div>
@@ -254,7 +365,8 @@ export const TripPlanner = ({ onBack }: Props) => {
 
       {/* info */}
       <p className="pt-2 text-center text-[11px] opacity-40">
-        Rute KRL + Transjakarta. Transit di halte BRT terdekat dari stasiun.
+        KRL + Transjakarta + Gojek. Estimasi biaya & waktu, bisa beda dari
+        aktual.
       </p>
     </div>
   );
