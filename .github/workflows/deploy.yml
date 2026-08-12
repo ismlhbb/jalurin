@@ -39,10 +39,10 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          # Pages Functions harus ada di dalam direktori yang di-deploy
-          mkdir -p .dist
-          cp -r functions .dist/functions
-          npx --yes wrangler@4 pages deploy .dist \
+          # Build Pages Functions -> .dist/_worker.js (advanced mode)
+          # NOTE: wrangler cuma deteksi file .js (bukan .ts) di functions/
+          npx --yes wrangler@3.114.0 pages functions build functions --outdir=.dist
+          npx --yes wrangler@3.114.0 pages deploy .dist \
             --project-name=comuline-web \
             --branch=main \
             --commit-dirty=true
