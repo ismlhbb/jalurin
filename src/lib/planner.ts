@@ -242,10 +242,17 @@ function tjPath(fromStop: string, toStop: string): TripLeg[] {
         m += 4;
       }
     }
+    // normalisasi arah: leg harus dari fromStop → toStop (bukan kebalik)
+    // BFS backward menambah stop di depan — normalize biar arah konsisten
+    const fwd = st[0] === fromStop || st[st.length - 1] === toStop;
+    const from = fwd ? st[0] : st[st.length - 1];
+    const to = fwd ? st[st.length - 1] : st[0];
     return {
       ...l,
-      from_name: STOP_NAME[l.from] ?? l.from,
-      to_name: STOP_NAME[l.to] ?? l.to,
+      from,
+      to,
+      from_name: STOP_NAME[from] ?? from,
+      to_name: STOP_NAME[to] ?? to,
       minutes: m,
       cost: TJ_COST,
     };
@@ -399,8 +406,8 @@ export function planTrip(
       const stops = stopsNearKrl(krlId);
       if (!stops.length) continue;
       const krl = krlPath(fromKrl, krlId);
-      if (!krl || krl.length <= 1) continue;
-      const krlMin = krlLegMinutes(krl);
+      if (!krl) continue;
+      const krlMin = krl.length > 1 ? krlLegMinutes(krl) : 0;
       for (const { id: stopId, dist } of stops) {
         const tjLegs = tjPath(stopId, toTj);
         if (!tjLegs.length) continue;
@@ -434,7 +441,7 @@ export function planTrip(
       const { krl: transitKrl, stop: transitStop } = bestTransit;
       const krl = krlPath(fromKrl, transitKrl);
       const tjLegs = tjPath(transitStop, toTj);
-      if (krl && krl.length > 1 && tjLegs.length) {
+      if (krl && tjLegs.length) {
         const krlKm = krl.reduce((acc, s, i) => {
           if (i === 0) return acc;
           const c1 = KRL_COORD(krl[i - 1].station);
@@ -442,20 +449,27 @@ export function planTrip(
           return acc + (c1 && c2 ? haversineKm(c1, c2) : 0);
         }, 0);
         const legs: TripLeg[] = [];
-        legs.push(
-          goRideLeg(fromLabel, KRL_NAME(fromKrl), fromCoord, KRL_COORD(fromKrl)!),
-        );
-        legs.push({
-          mode: "krl",
-          from: fromKrl,
-          to: transitKrl,
-          from_name: KRL_NAME(fromKrl),
-          to_name: KRL_NAME(transitKrl),
-          stops: krl.map((k) => k.station),
-          minutes: krlLegMinutes(krl),
-          cost: krlCost(krlKm),
-          note: `KRL ${krl.length - 1} stasiun (${krlKm.toFixed(1)} km)`,
-        });
+        // kalau fromKrl != transitKrl, naik KRL dulu (skip kalau udah di sana)
+        if (fromKrl !== transitKrl) {
+          legs.push(
+            goRideLeg(fromLabel, KRL_NAME(fromKrl), fromCoord, KRL_COORD(fromKrl)!),
+          );
+          legs.push({
+            mode: "krl",
+            from: fromKrl,
+            to: transitKrl,
+            from_name: KRL_NAME(fromKrl),
+            to_name: KRL_NAME(transitKrl),
+            stops: krl.map((k) => k.station),
+            minutes: krlLegMinutes(krl),
+            cost: krlCost(krlKm),
+            note: `KRL ${krl.length - 1} stasiun (${krlKm.toFixed(1)} km)`,
+          });
+        } else {
+          legs.push(
+            goRideLeg(fromLabel, KRL_NAME(fromKrl), fromCoord, KRL_COORD(fromKrl)!),
+          );
+        }
         // walk KRL station -> TJ stop (jarak real dari bestTransit)
         const walkLeg: TripLeg = {
           mode: "walk",
@@ -469,9 +483,25 @@ export function planTrip(
         };
         legs.push(walkLeg);
         legs.push(...tjLegs);
-        legs.push(
-          goRideLeg(STOP_NAME[toTj] ?? toTj, toLabel, [TJ_STOP(toTj)!.lat, TJ_STOP(toTj)!.lon] as [number, number], toCoord),
-        );
+        // GoRide last-mile: skip kalau tujuan udah dekat halte (<400m)
+        const toStop = TJ_STOP(toTj)!;
+        const lastDist = haversineKm([toStop.lat, toStop.lon], toCoord);
+        if (lastDist >= 0.4) {
+          legs.push(
+            goRideLeg(STOP_NAME[toTj] ?? toTj, toLabel, [toStop.lat, toStop.lon], toCoord),
+          );
+        } else {
+          legs.push({
+            mode: "walk",
+            from: STOP_NAME[toTj] ?? toTj,
+            to: toLabel,
+            from_name: STOP_NAME[toTj] ?? toTj,
+            to_name: toLabel,
+            minutes: Math.max(2, Math.round((lastDist / 5) * 60)),
+            cost: 0,
+            note: `Jalan kaki ${(lastDist * 1000).toFixed(0)} m ke tujuan`,
+          });
+        }
         push({
           label: "GoRide + KRL + Transjakarta",
           desc: `KRL ke ${KRL_NAME(transitKrl)}, jalan ke halte ${STOP_NAME[transitStop] ?? transitStop}, TJ ke ${STOP_NAME[toTj] ?? toTj}`,

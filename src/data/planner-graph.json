@@ -85,9 +85,6 @@
   "TEB": {
    "name": "TEBET"
   },
-  "BST": {
-   "name": "BANDARA SOEKARNO HATTA"
-  },
   "DAR": {
    "name": "DARU"
   },
@@ -112,9 +109,6 @@
   "BOO": {
    "name": "BOGOR"
   },
-  "CKP": {
-   "name": "CIKAMPEK"
-  },
   "PRP": {
    "name": "PARUNG PANJANG"
   },
@@ -132,9 +126,6 @@
   },
   "DP": {
    "name": "DEPOK"
-  },
-  "PWK": {
-   "name": "PURWAKARTA"
   },
   "LNA": {
    "name": "LENTENG AGUNG"
@@ -249,9 +240,6 @@
   },
   "RK": {
    "name": "RANGKASBITUNG"
-  },
-  "MER": {
-   "name": "MERAK"
   },
   "DRN": {
    "name": "DUREN KALIBATA"
@@ -376,10 +364,6 @@
    -6.257751,
    106.87
   ],
-  "BST": [
-   -6.1274022,
-   106.6521883
-  ],
   "DAR": [
    -6.3380423,
    106.4924115
@@ -412,10 +396,6 @@
    -6.5942887,
    106.7907695
   ],
-  "CKP": [
-   -6.4178,
-   107.4577
-  ],
   "PRP": [
    -6.3442588,
    106.5699527
@@ -439,10 +419,6 @@
   "DP": [
    -6.4048263,
    106.8170842
-  ],
-  "PWK": [
-   -6.5463,
-   107.4383
   ],
   "LNA": [
    -6.3303079,
@@ -561,8 +537,8 @@
    106.824296
   ],
   "CC": [
-   -6.3295492,
-   106.6189347
+   -6.3228,
+   106.6
   ],
   "KLD": [
    -6.213596,
@@ -577,8 +553,8 @@
    106.8216909
   ],
   "SRP": [
-   -6.239889,
-   106.79897
+   -6.3148,
+   106.6655
   ],
   "AC": [
    -6.127563,
@@ -596,10 +572,6 @@
    -6.3526392,
    106.2510979
   ],
-  "MER": [
-   -5.9353,
-   105.997
-  ],
   "DRN": [
    -6.2552012,
    106.8551672
@@ -615,549 +587,419 @@
  },
  "edges": [
   {
-   "a": "PSMB",
-   "b": "PSM",
-   "line": "COMMUTER LINE BOGOR"
+   "a": "JAKK",
+   "b": "JAY",
+   "line": "jak"
   },
   {
-   "a": "KMO",
-   "b": "GST",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "TGS",
-   "b": "TEJ",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "KLDB",
-   "b": "KRI",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "MRI",
-   "b": "TEB",
-   "line": "COMMUTER LINE BOGOR"
-  },
-  {
-   "a": "BJD",
-   "b": "CTA",
-   "line": "COMMUTER LINE BOGOR"
-  },
-  {
-   "a": "DP",
-   "b": "CTA",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "PLM",
-   "b": "KBY",
-   "line": "COMMUTER LINE RANGKASBITUNG"
-  },
-  {
-   "a": "KMO",
-   "b": "RJW",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "CJT",
-   "b": "DAR",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "PSM",
-   "b": "MRI",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "POC",
-   "b": "DPB",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "MJ",
-   "b": "CKY",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "CKY",
-   "b": "TGS",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "PSM",
-   "b": "UI",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "DPB",
-   "b": "LNA",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "PSMB",
-   "b": "DRN",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
+   "a": "JAY",
+   "b": "MGB",
+   "line": "jak"
   },
   {
    "a": "MGB",
    "b": "SW",
-   "line": "COMMUTER LINE BOGOR"
-  },
-  {
-   "a": "MRI",
-   "b": "JNG",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "DRN",
-   "b": "CW",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "MGB",
-   "b": "JAY",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "KDS",
-   "b": "PI",
-   "line": "COMMUTER LINE BST"
-  },
-  {
-   "a": "TB",
-   "b": "BKST",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "BUA",
-   "b": "KLDB",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "BKS",
-   "b": "BKST",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "GGL",
-   "b": "DU",
-   "line": "COMMUTER LINE BST"
-  },
-  {
-   "a": "LNA",
-   "b": "TNT",
-   "line": "COMMUTER LINE BOGOR"
-  },
-  {
-   "a": "SUD",
-   "b": "MRI",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "CW",
-   "b": "TEB",
-   "line": "COMMUTER LINE BOGOR"
-  },
-  {
-   "a": "THB",
-   "b": "DU",
-   "line": "COMMUTER LINE BST"
-  },
-  {
-   "a": "CC",
-   "b": "PRP",
-   "line": "COMMUTER LINE RANGKASBITUNG"
-  },
-  {
-   "a": "SUDB",
-   "b": "SUD",
-   "line": "COMMUTER LINE RANGKASBITUNG"
-  },
-  {
-   "a": "KLD",
-   "b": "MTR",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "DAR",
-   "b": "TEJ",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "KBY",
-   "b": "PDJ",
-   "line": "COMMUTER LINE RANGKASBITUNG"
-  },
-  {
-   "a": "KRI",
-   "b": "BKS",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "MJ",
-   "b": "CTR",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "JUA",
-   "b": "GDD",
-   "line": "COMMUTER LINE BOGOR"
-  },
-  {
-   "a": "TNT",
-   "b": "PSMB",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "THB",
-   "b": "KAT",
-   "line": "COMMUTER LINE RANGKASBITUNG"
-  },
-  {
-   "a": "BJD",
-   "b": "CLT",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "KDS",
-   "b": "RW",
-   "line": "COMMUTER LINE TANGERANG"
-  },
-  {
-   "a": "GGL",
-   "b": "PSG",
-   "line": "COMMUTER LINE BST"
-  },
-  {
-   "a": "KLD",
-   "b": "BUA",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "BOI",
-   "b": "TKO",
-   "line": "COMMUTER LINE BST"
-  },
-  {
-   "a": "KAT",
-   "b": "SUD",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "CUK",
-   "b": "KLDB",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "BOO",
-   "b": "CLT",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "GDD",
-   "b": "CKI",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "CUK",
-   "b": "BUA",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "KLD",
-   "b": "JNG",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "KAT",
-   "b": "MRI",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "CC",
-   "b": "CSK",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "BOI",
-   "b": "RW",
-   "line": "COMMUTER LINE BST"
-  },
-  {
-   "a": "PSG",
-   "b": "TKO",
-   "line": "COMMUTER LINE BST"
-  },
-  {
-   "a": "KAT",
-   "b": "SUDB",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "CKI",
-   "b": "MGB",
-   "line": "COMMUTER LINE BOGOR"
-  },
-  {
-   "a": "SW",
-   "b": "CKI",
-   "line": "COMMUTER LINE BOGOR"
-  },
-  {
-   "a": "TB",
-   "b": "CIT",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "BPR",
-   "b": "PI",
-   "line": "COMMUTER LINE TANGERANG"
-  },
-  {
-   "a": "THB",
-   "b": "MRI",
-   "line": "COMMUTER LINE RANGKASBITUNG"
-  },
-  {
-   "a": "BKS",
-   "b": "TB",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "CKI",
-   "b": "MRI",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "NMO",
-   "b": "CBN",
-   "line": "COMMUTER LINE BOGOR"
-  },
-  {
-   "a": "SRP",
-   "b": "THB",
-   "line": "COMMUTER LINE RANGKASBITUNG"
-  },
-  {
-   "a": "DP",
-   "b": "DPB",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "THB",
-   "b": "SUDB",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "POC",
-   "b": "DP",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "AC",
-   "b": "KPB",
-   "line": "COMMUTER LINE TANJUNGPRIUK"
-  },
-  {
-   "a": "JAKK",
-   "b": "KPB",
-   "line": "COMMUTER LINE TANJUNGPRIUK"
-  },
-  {
-   "a": "MJ",
-   "b": "TGS",
-   "line": "COMMUTER LINE RANGKASBITUNG"
-  },
-  {
-   "a": "KPB",
-   "b": "AK",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "CKR",
-   "b": "TLM",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "AK",
-   "b": "DU",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "TPK",
-   "b": "AC",
-   "line": "COMMUTER LINE TANJUNGPRIUK"
-  },
-  {
-   "a": "THB",
-   "b": "PLM",
-   "line": "COMMUTER LINE RANGKASBITUNG"
-  },
-  {
-   "a": "MRI",
-   "b": "DU",
-   "line": "COMMUTER LINE BST"
-  },
-  {
-   "a": "JNG",
-   "b": "KMT",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "KMT",
-   "b": "POK",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "CJT",
-   "b": "PRP",
-   "line": "COMMUTER LINE RANGKASBITUNG"
-  },
-  {
-   "a": "BST",
-   "b": "BPR",
-   "line": "COMMUTER LINE BST"
-  },
-  {
-   "a": "KPB",
-   "b": "RJW",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "CTA",
-   "b": "PDRG",
-   "line": "COMMUTER LINE BOGOR"
-  },
-  {
-   "a": "SUD",
-   "b": "THB",
-   "line": "COMMUTER LINE RANGKASBITUNG"
-  },
-  {
-   "a": "KMT",
-   "b": "GST",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "CBN",
-   "b": "PDRG",
-   "line": "COMMUTER LINE BOGOR"
-  },
-  {
-   "a": "CIT",
-   "b": "TLM",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "JAKK",
-   "b": "JAY",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
-  },
-  {
-   "a": "MTR",
-   "b": "JNG",
-   "line": "COMMUTER LINE CIKARANG"
+   "line": "jak"
   },
   {
    "a": "SW",
    "b": "JUA",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
+   "line": "jak"
   },
   {
-   "a": "JNG",
-   "b": "POK",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "SUD",
-   "b": "MTR",
-   "line": "COMMUTER LINE CIKARANG"
-  },
-  {
-   "a": "SDM",
-   "b": "RU",
-   "line": "COMMUTER LINE RANGKASBITUNG"
-  },
-  {
-   "a": "MGB",
+   "a": "JUA",
    "b": "GDD",
-   "line": "COMMUTER LINE BOGOR"
+   "line": "jak"
   },
   {
-   "a": "JNG",
-   "b": "SUD",
-   "line": "COMMUTER LINE CIKARANG"
+   "a": "GDD",
+   "b": "CKI",
+   "line": "jak"
   },
   {
-   "a": "JNG",
-   "b": "CUK",
-   "line": "DINAS RANGKAIAN KRL (TIDAK ANGKUT PENUMPANG)"
+   "a": "CKI",
+   "b": "MRI",
+   "line": "jak"
   },
   {
    "a": "MRI",
-   "b": "MTR",
-   "line": "COMMUTER LINE CIKARANG"
+   "b": "TEB",
+   "line": "jak"
   },
   {
-   "a": "KLD",
-   "b": "POK",
-   "line": "COMMUTER LINE CIKARANG"
+   "a": "TEB",
+   "b": "CW",
+   "line": "jak"
   },
   {
-   "a": "CUK",
-   "b": "KLD",
-   "line": "COMMUTER LINE CIKARANG"
+   "a": "CW",
+   "b": "DRN",
+   "line": "jak"
   },
   {
-   "a": "TNG",
-   "b": "BPR",
-   "line": ""
+   "a": "DRN",
+   "b": "PSMB",
+   "line": "jak"
   },
   {
-   "a": "TTI",
-   "b": "GST",
-   "line": ""
+   "a": "PSMB",
+   "b": "PSM",
+   "line": "jak"
+  },
+  {
+   "a": "PSM",
+   "b": "TNT",
+   "line": "jak"
+  },
+  {
+   "a": "TNT",
+   "b": "LNA",
+   "line": "jak"
+  },
+  {
+   "a": "LNA",
+   "b": "UP",
+   "line": "jak"
+  },
+  {
+   "a": "UP",
+   "b": "UI",
+   "line": "jak"
+  },
+  {
+   "a": "UI",
+   "b": "POC",
+   "line": "jak"
+  },
+  {
+   "a": "POC",
+   "b": "DPB",
+   "line": "jak"
+  },
+  {
+   "a": "DPB",
+   "b": "DP",
+   "line": "jak"
+  },
+  {
+   "a": "DP",
+   "b": "CTA",
+   "line": "jak"
+  },
+  {
+   "a": "CTA",
+   "b": "BJD",
+   "line": "jak"
+  },
+  {
+   "a": "BJD",
+   "b": "CLT",
+   "line": "jak"
+  },
+  {
+   "a": "CLT",
+   "b": "BOO",
+   "line": "jak"
+  },
+  {
+   "a": "CTA",
+   "b": "PDRG",
+   "line": "cta"
+  },
+  {
+   "a": "PDRG",
+   "b": "CBN",
+   "line": "cta"
+  },
+  {
+   "a": "CBN",
+   "b": "NMO",
+   "line": "cta"
+  },
+  {
+   "a": "JAKK",
+   "b": "KPB",
+   "line": "jak"
+  },
+  {
+   "a": "KPB",
+   "b": "RJW",
+   "line": "jak"
+  },
+  {
+   "a": "RJW",
+   "b": "KMO",
+   "line": "jak"
+  },
+  {
+   "a": "KMO",
+   "b": "PSE",
+   "line": "jak"
   },
   {
    "a": "PSE",
-   "b": "TEB",
-   "line": ""
+   "b": "GST",
+   "line": "jak"
   },
   {
-   "a": "RK",
-   "b": "CTR",
-   "line": ""
+   "a": "GST",
+   "b": "KMT",
+   "line": "jak"
+  },
+  {
+   "a": "KMT",
+   "b": "POK",
+   "line": "jak"
+  },
+  {
+   "a": "POK",
+   "b": "JNG",
+   "line": "jak"
+  },
+  {
+   "a": "JNG",
+   "b": "KLD",
+   "line": "jak"
+  },
+  {
+   "a": "KLD",
+   "b": "BUA",
+   "line": "jak"
+  },
+  {
+   "a": "BUA",
+   "b": "KLDB",
+   "line": "jak"
+  },
+  {
+   "a": "KLDB",
+   "b": "CUK",
+   "line": "jak"
+  },
+  {
+   "a": "CUK",
+   "b": "KRI",
+   "line": "jak"
+  },
+  {
+   "a": "KRI",
+   "b": "BKS",
+   "line": "jak"
+  },
+  {
+   "a": "BKS",
+   "b": "BKST",
+   "line": "jak"
+  },
+  {
+   "a": "BKST",
+   "b": "TB",
+   "line": "jak"
+  },
+  {
+   "a": "TB",
+   "b": "CIT",
+   "line": "jak"
+  },
+  {
+   "a": "CIT",
+   "b": "TLM",
+   "line": "jak"
+  },
+  {
+   "a": "TLM",
+   "b": "CKR",
+   "line": "jak"
+  },
+  {
+   "a": "DU",
+   "b": "GGL",
+   "line": "du"
+  },
+  {
+   "a": "GGL",
+   "b": "PSG",
+   "line": "du"
+  },
+  {
+   "a": "PSG",
+   "b": "TKO",
+   "line": "du"
+  },
+  {
+   "a": "TKO",
+   "b": "BOI",
+   "line": "du"
+  },
+  {
+   "a": "BOI",
+   "b": "RW",
+   "line": "du"
+  },
+  {
+   "a": "RW",
+   "b": "KDS",
+   "line": "du"
+  },
+  {
+   "a": "KDS",
+   "b": "PI",
+   "line": "du"
+  },
+  {
+   "a": "PI",
+   "b": "BPR",
+   "line": "du"
+  },
+  {
+   "a": "BPR",
+   "b": "TTI",
+   "line": "du"
+  },
+  {
+   "a": "TTI",
+   "b": "TNG",
+   "line": "du"
+  },
+  {
+   "a": "THB",
+   "b": "PLM",
+   "line": "thb"
+  },
+  {
+   "a": "PLM",
+   "b": "KBY",
+   "line": "thb"
+  },
+  {
+   "a": "KBY",
+   "b": "PDJ",
+   "line": "thb"
+  },
+  {
+   "a": "PDJ",
+   "b": "JMU",
+   "line": "thb"
   },
   {
    "a": "JMU",
    "b": "SDM",
-   "line": ""
-  },
-  {
-   "a": "CKP",
-   "b": "PWK",
-   "line": ""
-  },
-  {
-   "a": "PWK",
-   "b": "CKP",
-   "line": ""
-  },
-  {
-   "a": "UP",
-   "b": "POC",
-   "line": ""
-  },
-  {
-   "a": "CC",
-   "b": "PDJ",
-   "line": ""
+   "line": "thb"
   },
   {
    "a": "SDM",
-   "b": "PDJ",
-   "line": ""
+   "b": "RU",
+   "line": "thb"
+  },
+  {
+   "a": "RU",
+   "b": "SRP",
+   "line": "thb"
+  },
+  {
+   "a": "SRP",
+   "b": "CSK",
+   "line": "thb"
+  },
+  {
+   "a": "CSK",
+   "b": "CC",
+   "line": "thb"
+  },
+  {
+   "a": "CC",
+   "b": "PRP",
+   "line": "thb"
+  },
+  {
+   "a": "PRP",
+   "b": "CJT",
+   "line": "thb"
+  },
+  {
+   "a": "CJT",
+   "b": "DAR",
+   "line": "thb"
+  },
+  {
+   "a": "DAR",
+   "b": "TEJ",
+   "line": "thb"
+  },
+  {
+   "a": "TEJ",
+   "b": "TGS",
+   "line": "thb"
+  },
+  {
+   "a": "TGS",
+   "b": "CKY",
+   "line": "thb"
+  },
+  {
+   "a": "CKY",
+   "b": "MJ",
+   "line": "thb"
+  },
+  {
+   "a": "MJ",
+   "b": "CTR",
+   "line": "thb"
+  },
+  {
+   "a": "CTR",
+   "b": "RK",
+   "line": "thb"
+  },
+  {
+   "a": "KPB",
+   "b": "AC",
+   "line": "jak"
+  },
+  {
+   "a": "AC",
+   "b": "TPK",
+   "line": "jak"
+  },
+  {
+   "a": "THB",
+   "b": "KAT",
+   "line": "thb"
+  },
+  {
+   "a": "KAT",
+   "b": "SUD",
+   "line": "thb"
+  },
+  {
+   "a": "SUD",
+   "b": "SUDB",
+   "line": "thb"
+  },
+  {
+   "a": "SUDB",
+   "b": "MRI",
+   "line": "thb"
+  },
+  {
+   "a": "MRI",
+   "b": "MTR",
+   "line": "mri"
+  },
+  {
+   "a": "MTR",
+   "b": "JNG",
+   "line": "mri"
+  },
+  {
+   "a": "DU",
+   "b": "AK",
+   "line": "du"
+  },
+  {
+   "a": "THB",
+   "b": "DU",
+   "line": "thb"
   }
  ],
  "transfers": {
